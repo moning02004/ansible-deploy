@@ -1,0 +1,4 @@
+repo_url: "https://github.com/moning02004/install-docker.git"
+dest_path: "/home/manager/install-docker"
+repo_version: HEAD
+deploy_user: "manager"

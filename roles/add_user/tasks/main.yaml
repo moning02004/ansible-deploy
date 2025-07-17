@@ -1,0 +1,19 @@
+- name: Ensure deploy user exists
+  user:
+    name: "{{ deploy_user }}"
+    shell: /bin/bash
+    create_home: yes
+
+- name: Ensure git is installed (Debian)
+  apt:
+    name: git
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Ensure parent directory exists
+  file:
+    path: "{{ dest_path | dirname }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0755'

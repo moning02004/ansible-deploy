@@ -1,0 +1,4 @@
+vault_password.txt
+inventory/all.ini
+group_vars/all.yaml
+.vscode

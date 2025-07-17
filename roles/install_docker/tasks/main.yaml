@@ -1,0 +1,16 @@
+- name: Check if Docker is installed
+  ansible.builtin.shell: which docker
+  register: docker_check
+  ignore_errors: yes
+  
+- name: Clone repository as deploy user
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ dest_path }}"
+    version: "{{ repo_version }}"
+    force: yes
+  when: docker_check.rc != 0
+
+- name: Run install-docker.sh
+  command: "/bin/bash {{ dest_path }}/install.sh"
+  when: docker_check.rc != 0

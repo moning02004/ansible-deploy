@@ -1,0 +1,4 @@
+repo_url: "git repository url"
+dest_path: "git repository path"
+repo_version: HEAD
+deploy_user: "new user"

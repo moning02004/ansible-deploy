@@ -2,3 +2,6 @@ repo_url: "git repository url"
 dest_path: "git repository path"
 repo_version: HEAD
 deploy_user: "new user"
+
+rabbitmq_user: "admin"
+rabbitmq_password: "password!2"

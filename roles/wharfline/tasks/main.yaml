@@ -1,0 +1,131 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that:
+      - wharfline_domain | length > 0
+      - wharfline_postgres_password | length > 0
+      - wharfline_owner_email | length > 0
+      - wharfline_owner_password | length >= 10
+    fail_msg: "wharfline_domain / wharfline_postgres_password / wharfline_owner_email / wharfline_owner_password(10자 이상) 를 vault 에 설정하세요"
+    quiet: true
+
+- name: Check architecture (images are amd64 only)
+  ansible.builtin.assert:
+    that: ansible_architecture == 'x86_64' or wharfline_platform | length > 0
+    fail_msg: >-
+      wharfline 이미지는 amd64 전용입니다 (현재: {{ ansible_architecture }}).
+      ARM 서버라면 wharfline_platform: linux/amd64 로 에뮬레이션 실행할 수 있습니다 (느림)
+    quiet: true
+
+- name: Install amd64 emulation (ARM server)
+  ansible.builtin.apt:
+    name: [qemu-user-static, binfmt-support]
+    state: present
+  when: wharfline_platform | length > 0 and ansible_architecture != 'x86_64' and wharfline_install_qemu | bool
+
+- name: Create directories
+  ansible.builtin.file:
+    path: "{{ wharfline_dir }}/{{ item.path }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "",        mode: "0750" }
+    - { path: secrets,   mode: "0700" }
+    - { path: backups,   mode: "0700" }
+
+- name: Download deploy files ({{ wharfline_version }})
+  ansible.builtin.get_url:
+    url: "{{ wharfline_repo_raw }}/{{ wharfline_version }}/deploy/{{ item }}"
+    dest: "{{ wharfline_dir }}/{{ item }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+    force: true
+  loop: [docker-compose.yml, Makefile, Caddyfile]
+
+- name: Write .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ wharfline_dir }}/.env"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  no_log: true
+
+# 앱 이미지(migrate/backend/frontend)에만 platform 지정. postgres 등 공용 이미지는 서버 기본 아키텍처 유지
+- name: Write docker-compose.override.yml (platform)
+  ansible.builtin.copy:
+    dest: "{{ wharfline_dir }}/docker-compose.override.yml"
+    content: |
+      # Ansible 관리 파일 (wharfline_platform)
+      services:
+        migrate:  { platform: {{ wharfline_platform }} }
+        backend:  { platform: {{ wharfline_platform }} }
+        frontend: { platform: {{ wharfline_platform }} }
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+  when: wharfline_platform | length > 0
+
+- name: Remove platform override
+  ansible.builtin.file:
+    path: "{{ wharfline_dir }}/docker-compose.override.yml"
+    state: absent
+  when: wharfline_platform | length == 0
+
+- name: Install master key from vault
+  ansible.builtin.copy:
+    dest: "{{ wharfline_dir }}/secrets/master_keys"
+    content: "{{ wharfline_master_key }}\n"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"   # 컨테이너 유저가 읽어야 함. 상위 secrets/ 가 0700 이라 다른 호스트 유저는 접근 불가
+  when: wharfline_master_key | length > 0
+  no_log: true
+
+- name: Generate master key (first time only)
+  ansible.builtin.shell: |
+    umask 022
+    printf 'k%s:%s\n' "$(date -u +%Y%m%d%H%M%S)" "$(openssl rand -base64 32)" > master_keys
+    chown {{ deploy_user }}:{{ deploy_user }} master_keys
+  args:
+    chdir: "{{ wharfline_dir }}/secrets"
+    creates: "{{ wharfline_dir }}/secrets/master_keys"
+  when: wharfline_master_key | length == 0
+  register: wharfline_keygen
+
+- name: Fetch generated master key to controller
+  ansible.builtin.fetch:
+    src: "{{ wharfline_dir }}/secrets/master_keys"
+    dest: "{{ playbook_dir }}/secrets/{{ inventory_hostname }}/wharfline_master_keys"
+    flat: true
+  when: wharfline_keygen is changed
+
+- name: Remind to back up master key
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ 마스터 키를 새로 만들었습니다 → secrets/{{ inventory_hostname }}/wharfline_master_keys.
+      내용을 vault 의 wharfline_master_key 로 옮기고 로컬 파일은 지우세요. 잃으면 비밀 값을 복구할 수 없습니다.
+  when: wharfline_keygen is changed
+
+- name: Start wharfline
+  community.docker.docker_compose_v2:
+    project_src: "{{ wharfline_dir }}"
+    state: present
+    remove_orphans: true
+    wait: true
+    wait_timeout: 600
+  register: wharfline_up
+  # 일회용 migrate 컨테이너는 up 할 때마다 다시 실행됨 (마이그레이션은 advisory lock 으로 안전) → 변경으로 세지 않음
+  changed_when: >-
+    wharfline_up.actions | default([])
+    | rejectattr('id', 'search', 'migrate') | list | length > 0
+
+- name: Wait for wharfline web
+  ansible.builtin.uri:
+    url: "http://{{ wharfline_web_bind }}:{{ wharfline_web_port }}/"
+  register: wharfline_web
+  until: wharfline_web.status == 200
+  retries: 30
+  delay: 5

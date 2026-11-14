@@ -1,2 +1,9 @@
+# 서버 정의 (접속 정보)
+server1 ansible_host=192.168.0.104 ansible_port=22 ansible_user=ubuntu ansible_ssh_pass=password ansible_become_password=password
+
+# 프리셋 그룹: 서버를 용도에 맞는 그룹에 넣으면 해당 NN-*.yaml 이 적용됩니다
 [servers]
-server1 ansible_host=192.168.0.104  ansible_port=22 ansible_user=ubuntu ansible_ssh_pass=password ansible_become_password=password
+server1
+
+[gitea]
+server1

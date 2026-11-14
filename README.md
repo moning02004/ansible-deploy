@@ -5,7 +5,7 @@
 | # | 플레이북 | 내용 | 상태 |
 |---|---|---|---|
 | 01 | `01-base.yaml` | 공통 설정, deploy 유저, ufw, Docker, docker rollout | ✅ |
-| 02 | `02-gitea.yaml` | base + Gitea + act_runner + wharfline + nginx | ⬜ |
+| 02 | `02-gitea.yaml` | base + Gitea + act_runner + wharfline + nginx | ✅ |
 | 03 | `03-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ⬜ |
 | 04 | `04-app.yaml` | base + nginx + 배포 디렉터리 (CI가 배포하는 대상 서버) | ⬜ |
 | 05 | `05-postgres.yaml` | base + PostgreSQL | ⬜ |
@@ -57,6 +57,10 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 - 테스트 변수: `tests/vars.yaml` (vault 대신 사용, 비밀번호 불필요)
 - 플레이북을 추가하면 같은 이름으로 verify 파일도 추가합니다.
 
+## 인벤토리 그룹
+각 프리셋은 같은 이름의 인벤토리 그룹에 적용됩니다 (`02-gitea.yaml` → `[gitea]`).
+02 이후 플레이북은 01-base 를 먼저 실행하는데, 이때도 그 그룹에만 적용됩니다.
+
 ## 01-base 주요 변수
 | 변수 | 기본값 | 설명 |
 |---|---|---|
@@ -72,3 +76,18 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 
 > ⚠️ Docker로 publish한 포트(`-p 5432:5432`)는 ufw를 우회해서 외부에 열립니다.
 > nginx 뒤에 둘 서비스는 `127.0.0.1:포트`로만 바인딩하세요. 외부 접근 제어는 07-security에서 다룹니다.
+
+## 02-gitea
+| 구성 | 위치 | 접속 |
+|---|---|---|
+| nginx | 호스트 (apt) | 80 / 443 |
+| Gitea + Postgres + act_runner | `/opt/gitea` (compose) | `http(s)://gitea_domain`, SSH `2222` |
+| wharfline | `/opt/wharfline` (저장소 `deploy/` 방식) | `http(s)://wharfline_domain` |
+
+- 필수 변수와 예시: `group_vars/all/vault.yaml.example`
+- 버전: `gitea_version` 28.3.0, `act_runner_version` 0.6.1, `wharfline_version` v2026.11.14-1
+- **HTTPS**: `nginx_certbot_email` 을 지정하면 도메인마다 Let's Encrypt 인증서를 받고 HTTP → HTTPS 로 넘깁니다. Gitea ROOT_URL 과 wharfline 쿠키 Secure 도 자동으로 https 기준이 됩니다. (DNS A 레코드가 서버를 가리켜야 함, 로컬 테스트에서는 검증하지 않음)
+- **Gitea 관리자**: `gitea_admin`. `admin` 은 Gitea 예약어라 쓸 수 없습니다.
+- **act_runner**: 첫 실행 때 토큰을 발급해 자동 등록합니다. 다시 등록하려면 `/opt/gitea/runner.env` 와 `gitea_runner_data` 볼륨을 지우고 재실행하세요.
+- **wharfline 마스터 키**: `wharfline_master_key` 를 비워 두면 첫 실행 때 서버에서 만들고 `secrets/<호스트>/wharfline_master_keys` 로 가져옵니다(gitignore). **vault 로 옮기고 로컬 파일은 지우세요.** 잃으면 저장된 비밀 값을 복구할 수 없습니다.
+- **wharfline 이미지는 amd64 전용**입니다. ARM 서버에서는 `wharfline_platform: linux/amd64` 로 에뮬레이션 실행할 수 있습니다(느림).

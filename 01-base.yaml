@@ -6,7 +6,7 @@
 #   특정 서버만:   --limit server1
 #   일부만:        --tags docker   (common / user / firewall / docker / rollout)
 - name: "01 base | 기본 서버 구성"
-  hosts: all
+  hosts: "{{ base_hosts | default('all') }}"   # 다른 프리셋에서 import 할 때 대상 그룹으로 바뀜
   become: true
 
   roles:

@@ -1,0 +1,101 @@
+# 02-gitea 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 02 gitea"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: nginx config is valid
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Gitea responds through nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/api/healthz
+        headers: { Host: "{{ gitea_domain }}" }
+
+    - name: Gitea admin can log in via API
+      ansible.builtin.uri:
+        url: http://127.0.0.1/api/v1/user
+        headers: { Host: "{{ gitea_domain }}" }
+        user: "{{ gitea_admin_user | default('gitea_admin') }}"
+        password: "{{ gitea_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: me
+      failed_when: me.json.is_admin is not true
+
+    - name: Gitea ROOT_URL matches domain
+      ansible.builtin.command: docker exec gitea grep -E '^ROOT_URL' /data/gitea/conf/app.ini
+      register: rooturl
+      changed_when: false
+      failed_when: "'http://' ~ gitea_domain ~ '/' not in rooturl.stdout"
+
+    - name: Gitea SSH port is listening
+      ansible.builtin.wait_for:
+        port: "{{ gitea_ssh_port | default(2222) }}"
+        timeout: 10
+
+    - name: act_runner is registered
+      ansible.builtin.command: docker exec gitea-runner cat /data/.runner
+      register: runner_file
+      changed_when: false
+      failed_when: "'uuid' not in runner_file.stdout"
+
+    - name: Runner is online in Gitea
+      ansible.builtin.uri:
+        url: http://127.0.0.1/api/v1/admin/actions/runners
+        headers: { Host: "{{ gitea_domain }}" }
+        user: "{{ gitea_admin_user | default('gitea_admin') }}"
+        password: "{{ gitea_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: runners
+      until: (runners.json.runners | default([]) | selectattr('status', 'equalto', 'online') | list | length) > 0
+      retries: 10
+      delay: 3
+
+    - name: wharfline responds through nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/
+        headers: { Host: "{{ wharfline_domain }}" }
+        return_content: true
+      register: wf
+      failed_when: "'<html' not in wf.content | lower"
+
+    - name: wharfline backend is healthy and migrate finished
+      ansible.builtin.command: docker compose ps -a --format '{{ "{{" }}.Service{{ "}}" }} {{ "{{" }}.State{{ "}}" }} {{ "{{" }}.Health{{ "}}" }} {{ "{{" }}.ExitCode{{ "}}" }}'
+      args:
+        chdir: /opt/wharfline
+      register: wf_ps
+      changed_when: false
+      failed_when: >-
+        wf_ps.stdout is not search('backend running healthy') or
+        wf_ps.stdout is not search('migrate exited\s+0')
+
+    - name: wharfline Owner was created
+      ansible.builtin.command: docker compose logs migrate
+      args:
+        chdir: /opt/wharfline
+      register: wf_migrate
+      changed_when: false
+      failed_when: "'Owner' not in wf_migrate.stdout"
+
+    - name: Secret files are private
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      loop:
+        - { path: /opt/gitea/.env,          mode: "0600" }
+        - { path: /opt/wharfline/.env,      mode: "0600" }
+        - { path: /opt/wharfline/secrets,   mode: "0700" }
+      register: perms
+      failed_when: perms.stat.mode != item.mode
+
+    - name: Internal services are not exposed on all interfaces
+      ansible.builtin.shell: ss -ltnH | awk '{print $4}'
+      register: listen
+      changed_when: false
+      failed_when: >-
+        listen.stdout is search('(0\.0\.0\.0|\*|\[::\]):(3000|8080|5432)\b')

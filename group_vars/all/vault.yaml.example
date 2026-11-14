@@ -1,13 +1,26 @@
 # group_vars/all/vault.yaml 의 평문 예시 (실제 파일은 ansible-vault로 암호화)
 #   편집: ansible-vault edit group_vars/all/vault.yaml --vault-password-file vault_password.txt
 
-# 01 base
+# ---------- 01 base ----------
 deploy_user: manager
 deploy_user_ssh_keys:
   - "ssh-ed25519 AAAA... me@laptop"
 # common_apt_upgrade: true
 # firewall_allowed_tcp_ports: [80, 443]
 
-# 08 middleware
+# ---------- 02 gitea ----------
+# nginx_certbot_email: you@example.com     # 지정하면 HTTPS (Let's Encrypt)
+gitea_domain: git.example.com
+gitea_db_password: "openssl rand -base64 32 로 생성"
+gitea_admin_email: you@example.com
+gitea_admin_password: "8자 이상"
+wharfline_domain: deploy.example.com
+wharfline_postgres_password: "openssl rand -base64 32 로 생성"
+wharfline_owner_email: you@example.com
+wharfline_owner_password: "10자 이상, 첫 로그인 때 변경"
+# wharfline_master_key: "k20261114...:base64..."   # 첫 실행 후 secrets/<호스트>/ 에 생긴 키를 여기로 옮기기
+# wharfline_platform: linux/amd64                   # ARM 서버일 때만
+
+# ---------- 08 middleware ----------
 rabbitmq_user: "admin"
 rabbitmq_password: "password!2"

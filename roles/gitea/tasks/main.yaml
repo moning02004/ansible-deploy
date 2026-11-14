@@ -1,0 +1,100 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that:
+      - gitea_domain | length > 0
+      - gitea_db_password | length > 0
+      - gitea_admin_email | length > 0
+      - gitea_admin_password | length >= 8
+    fail_msg: "gitea_domain / gitea_db_password / gitea_admin_email / gitea_admin_password(8자 이상) 를 vault 에 설정하세요"
+    quiet: true
+
+- name: Create gitea directory
+  ansible.builtin.file:
+    path: "{{ gitea_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0750"
+
+- name: Write .env (secrets)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ gitea_dir }}/.env"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Write docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ gitea_dir }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+
+- name: Allow Gitea SSH port
+  community.general.ufw:
+    rule: allow
+    port: "{{ gitea_ssh_port | string }}"
+    proto: tcp
+    comment: gitea-ssh
+
+- name: Start Gitea and DB
+  community.docker.docker_compose_v2:
+    project_src: "{{ gitea_dir }}"
+    services: [db, gitea]
+    state: present
+    wait: true
+    wait_timeout: 300
+
+- name: Wait for Gitea to be ready
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ gitea_http_port }}/api/healthz"
+  register: gitea_health
+  until: gitea_health.status == 200
+  retries: 30
+  delay: 3
+
+- name: List admin users
+  ansible.builtin.command: docker exec -u git gitea gitea admin user list --admin
+  register: gitea_admins
+  changed_when: false
+
+- name: Create admin user
+  ansible.builtin.command: >-
+    docker exec -u git gitea gitea admin user create --admin
+    --username {{ gitea_admin_user }} --email {{ gitea_admin_email }}
+    --password {{ gitea_admin_password | quote }} --must-change-password=false
+  when: gitea_admin_user not in gitea_admins.stdout.split()
+  no_log: true
+
+- name: Register act_runner
+  when: gitea_runner_enabled | bool
+  block:
+    - name: Check runner token file
+      ansible.builtin.stat:
+        path: "{{ gitea_dir }}/runner.env"
+      register: runner_env
+
+    - name: Generate runner registration token
+      ansible.builtin.command: docker exec -u git gitea gitea actions generate-runner-token
+      register: runner_token
+      when: not runner_env.stat.exists
+      no_log: true
+
+    - name: Write runner.env
+      ansible.builtin.copy:
+        dest: "{{ gitea_dir }}/runner.env"
+        content: "GITEA_RUNNER_REGISTRATION_TOKEN={{ runner_token.stdout_lines | last }}\n"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0600"
+      when: not runner_env.stat.exists
+      no_log: true
+
+- name: Start all services
+  community.docker.docker_compose_v2:
+    project_src: "{{ gitea_dir }}"
+    state: present
+    remove_orphans: true

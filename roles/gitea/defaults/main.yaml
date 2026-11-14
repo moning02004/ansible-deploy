@@ -1,0 +1,18 @@
+gitea_version: "28.3.0"            # https://github.com/go-gitea/gitea/releases
+act_runner_version: "0.6.1"        # https://hub.docker.com/r/gitea/act_runner/tags
+gitea_dir: /opt/gitea
+
+gitea_domain: ""                   # 필수. 예) git.example.com
+gitea_root_url: "{{ site_scheme | default('http') }}://{{ gitea_domain }}/"
+gitea_http_port: 3000              # 127.0.0.1 에만 바인딩 (nginx 가 프록시)
+gitea_ssh_port: 2222               # git clone ssh://git@도메인:2222/...
+gitea_disable_registration: true
+
+gitea_db_password: ""              # 필수 (vault)
+gitea_admin_user: gitea_admin      # 'admin' 은 Gitea 예약어라 사용 불가
+gitea_admin_email: ""              # 필수
+gitea_admin_password: ""           # 필수 (vault)
+
+gitea_runner_enabled: true
+gitea_runner_name: "{{ inventory_hostname }}-runner"
+gitea_runner_labels: ""            # 비우면 act_runner 기본 라벨 (ubuntu-latest 등)

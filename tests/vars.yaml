@@ -2,3 +2,16 @@
 deploy_user: manager
 deploy_user_ssh_keys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl test@orca"
+
+# 02 gitea
+gitea_domain: git.test
+gitea_db_password: test-gitea-db
+gitea_admin_email: admin@git.test
+gitea_admin_password: test-admin-pw
+wharfline_domain: deploy.test
+wharfline_postgres_password: test-wharfline-db
+wharfline_owner_email: owner@deploy.test
+wharfline_owner_password: test-owner-pw-1234
+# 테스트 머신이 arm64(Mac)여도 amd64 전용 wharfline 이미지를 돌리기 위함 (amd64 에서는 영향 없음)
+wharfline_platform: linux/amd64
+wharfline_install_qemu: false   # Docker Desktop 이 binfmt 를 이미 등록해 둠

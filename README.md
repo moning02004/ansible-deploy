@@ -55,7 +55,11 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 
 - 점검 항목: `tests/verify/NN-*.yaml`
 - 테스트 변수: `tests/vars.yaml` (vault 대신 사용, 비밀번호 불필요)
+- 사전 준비: `tests/prepare/NN-*.yaml` 이 있으면 먼저 실행 (07 은 base, 09/10 은 서비스+표시 데이터)
+- 테스트 이미지는 속도를 위해 KAIST apt 미러를 씁니다 (`APT_MIRROR=` 로 기본 미러)
 - 플레이북을 추가하면 같은 이름으로 verify 파일도 추가합니다.
+- 소요 시간(대략): 01 2분, 02 6분, 03 20분(GitLab), 04~09 3~5분, 10 10분
+- wharfline 이미지는 amd64 전용이라 arm64 Mac 에서는 에뮬레이션으로 돕니다 (`tests/vars.yaml` 의 `wharfline_platform`)
 
 ## 인벤토리 그룹
 각 프리셋은 같은 이름의 인벤토리 그룹에 적용됩니다 (`02-gitea.yaml` → `[gitea]`).

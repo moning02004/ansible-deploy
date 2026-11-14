@@ -36,7 +36,7 @@ grafana_admin_password: test-grafana-pw
 
 # 08 security
 security_disable_password_auth: true      # deploy_user_ssh_keys 가 있으므로 허용됨
-security_fail2ban_ignoreip: [192.0.2.10]
+security_whitelist_ips: [192.0.2.10, 198.51.100.0/24]
 
 # 09 middleware
 rabbitmq_user: mqadmin

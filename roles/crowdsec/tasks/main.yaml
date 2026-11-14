@@ -1,0 +1,137 @@
+# ---------------- CrowdSec 엔진 (Docker) ----------------
+- name: Create crowdsec directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop: ["{{ crowdsec_dir }}", "{{ crowdsec_dir }}/acquis.d"]
+
+- name: Generate bouncer key once
+  ansible.builtin.shell: |
+    umask 077
+    echo "CROWDSEC_BOUNCER_KEY=$(openssl rand -hex 32)" > {{ crowdsec_dir }}/.bouncer.env
+  args:
+    creates: "{{ crowdsec_dir }}/.bouncer.env"
+  when: crowdsec_bouncer_key | length == 0
+
+- name: Read bouncer key
+  ansible.builtin.slurp:
+    src: "{{ crowdsec_dir }}/.bouncer.env"
+  register: bouncer_env
+  when: crowdsec_bouncer_key | length == 0
+  no_log: true
+
+- name: Decide bouncer key
+  ansible.builtin.set_fact:
+    crowdsec_bouncer_key_effective: >-
+      {{ crowdsec_bouncer_key if crowdsec_bouncer_key | length > 0
+         else (bouncer_env.content | b64decode | trim).split('=', 1)[1] }}
+  no_log: true
+
+- name: Write .env (secrets)
+  ansible.builtin.copy:
+    dest: "{{ crowdsec_dir }}/.env"
+    content: |
+      CROWDSEC_BOUNCER_KEY={{ crowdsec_bouncer_key_effective }}
+      CROWDSEC_ENROLL_KEY={{ crowdsec_enroll_key }}
+    mode: "0600"
+  no_log: true
+
+- name: Write compose, acquisition and whitelist
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ crowdsec_dir }}/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: docker-compose.yml.j2, dest: docker-compose.yml }
+    - { src: acquis.yaml.j2, dest: acquis.d/orca.yaml }
+    - { src: whitelist.yaml.j2, dest: whitelist.yaml }
+  register: crowdsec_files
+
+- name: Start CrowdSec
+  community.docker.docker_compose_v2:
+    project_src: "{{ crowdsec_dir }}"
+    state: present
+    wait: true
+    wait_timeout: 300
+  register: crowdsec_up
+
+# 마운트한 설정 파일이 바뀌면 컨테이너가 다시 읽도록 재시작 (compose 는 파일 내용 변경을 모름)
+- name: Restart CrowdSec on config change
+  community.docker.docker_compose_v2:
+    project_src: "{{ crowdsec_dir }}"
+    state: restarted
+    wait: true
+    wait_timeout: 300
+  when: crowdsec_files is changed and crowdsec_up is not changed
+
+# ---------------- 방화벽 차단기 (호스트) ----------------
+- name: Add CrowdSec apt key
+  ansible.builtin.get_url:
+    url: https://packagecloud.io/crowdsec/crowdsec/gpgkey
+    dest: /etc/apt/keyrings/crowdsec.asc
+    mode: "0644"
+  register: cs_net_78
+  until: cs_net_78 is succeeded
+  retries: 5
+  delay: 10   # packagecloud 가 가끔 연결을 끊음
+
+- name: Add CrowdSec apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/crowdsec.asc] https://packagecloud.io/crowdsec/crowdsec/any any main"
+    filename: crowdsec
+    state: present
+  register: cs_net_885
+  until: cs_net_885 is succeeded
+  retries: 5
+  delay: 10   # packagecloud 가 가끔 연결을 끊음
+
+- name: Install firewall bouncer
+  ansible.builtin.apt:
+    name: crowdsec-firewall-bouncer-iptables
+    state: present
+    update_cache: true
+  register: cs_net_427
+  until: cs_net_427 is succeeded
+  retries: 5
+  delay: 10   # packagecloud 가 가끔 연결을 끊음
+
+- name: Configure firewall bouncer
+  ansible.builtin.template:
+    src: crowdsec-firewall-bouncer.yaml.j2
+    dest: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+    mode: "0600"
+  notify: Restart firewall bouncer
+  no_log: true
+
+- name: Create bouncer drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/crowdsec-firewall-bouncer.service.d
+    state: directory
+    mode: "0755"
+
+- name: Start bouncer after Docker (DOCKER-USER chain)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/crowdsec-firewall-bouncer.service.d/override.conf
+    content: |
+      [Unit]
+      After=docker.service
+      Wants=docker.service
+      [Service]
+      Restart=always
+      RestartSec=5
+    mode: "0644"
+  register: bouncer_dropin
+  notify: Restart firewall bouncer
+
+- name: Enable firewall bouncer
+  ansible.builtin.systemd_service:
+    name: crowdsec-firewall-bouncer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply bouncer restart now
+  ansible.builtin.meta: flush_handlers

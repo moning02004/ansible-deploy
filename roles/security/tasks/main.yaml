@@ -11,8 +11,20 @@
 # ---------- SSH ----------
 - name: Install packages
   ansible.builtin.apt:
-    name: [openssh-server, fail2ban, python3-systemd, unattended-upgrades]
+    name: [openssh-server, rsyslog, unattended-upgrades]   # rsyslog: /var/log/auth.log (CrowdSec 이 읽음)
     state: present
+
+- name: Remove fail2ban (replaced by CrowdSec)
+  ansible.builtin.apt:
+    name: fail2ban
+    state: absent
+    purge: true
+
+- name: Start rsyslog
+  ansible.builtin.service:
+    name: rsyslog
+    state: started
+    enabled: true
 
 - name: Ensure privilege separation dir (for sshd -t)
   ansible.builtin.file:
@@ -31,20 +43,6 @@
 - name: Validate full sshd config
   ansible.builtin.command: /usr/sbin/sshd -t
   changed_when: false
-
-# ---------- fail2ban ----------
-- name: fail2ban config
-  ansible.builtin.template:
-    src: jail.local.j2
-    dest: /etc/fail2ban/jail.local
-    mode: "0644"
-  notify: Restart fail2ban
-
-- name: Start fail2ban
-  ansible.builtin.service:
-    name: fail2ban
-    state: started
-    enabled: true
 
 # ---------- unattended-upgrades ----------
 - name: Enable automatic security updates

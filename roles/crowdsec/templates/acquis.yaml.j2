@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+{% for a in crowdsec_acquisitions %}
+---
+filenames:
+  - {{ a.path }}
+labels:
+  type: {{ a.type }}
+{% endfor %}

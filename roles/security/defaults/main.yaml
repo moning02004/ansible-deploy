@@ -4,10 +4,6 @@ security_permit_root_login: "no"
 security_disable_password_auth: false
 security_ssh_allow_users: []          # 비우면 제한 없음. 예) [manager, ubuntu]
 
-security_fail2ban_maxretry: 5
-security_fail2ban_findtime: 10m
-security_fail2ban_bantime: 1h
-security_fail2ban_ignoreip: []        # 차단하지 않을 관리자 IP/CIDR
 
 security_unattended_upgrades: true    # 보안 업데이트 자동 설치
 security_auto_reboot: false           # 커널 업데이트 후 자동 재부팅

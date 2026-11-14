@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+mode: iptables
+update_frequency: 10s
+log_mode: file
+log_dir: /var/log/
+log_level: info
+api_url: http://127.0.0.1:{{ crowdsec_lapi_port }}/
+api_key: {{ crowdsec_bouncer_key_effective }}
+insecure_skip_verify: false
+disable_ipv6: false
+deny_action: DROP
+deny_log: false
+supported_decisions_types:
+  - ban
+iptables_chains:
+{% for c in crowdsec_bouncer_chains %}
+  - {{ c }}
+{% endfor %}

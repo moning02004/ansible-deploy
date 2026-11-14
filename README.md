@@ -11,7 +11,7 @@
 | 05 | `05-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
 | 06 | `06-postgres.yaml` | base + PostgreSQL | ✅ |
 | 07 | `07-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ✅ |
-| 08 | `08-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ✅ |
+| 08 | `08-security.yaml` | 방화벽 규칙 재적용, CrowdSec, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ✅ |
 | 09 | `09-middleware.yaml` | RabbitMQ + Redis | ✅ |
 | 10 | `10-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ✅ |
 | 11 | `11-restore.yaml` | 백업 파일로 복구 | ✅ |
@@ -186,7 +186,7 @@ Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 06/09 는 전�
 |---|---|
 | 방화벽 | ufw 규칙(`firewall_*`)과 Docker 포트 규칙(06/09 의 rules.d) 재적용 |
 | SSH | root 로그인 차단, `security_disable_password_auth: true` 면 비밀번호 로그인 차단, MaxAuthTries 4 등 |
-| fail2ban | sshd 5회 실패 → 1시간 차단, `security_fail2ban_ignoreip` 로 관리자 IP 제외 |
+| CrowdSec | 엔진은 Docker(`/opt/crowdsec`), 차단기는 호스트 패키지. SSH 로그 + Traefik 액세스 로그로 공격 탐지, 커뮤니티 차단 목록 공유. `INPUT` 과 `DOCKER-USER` 모두 차단해서 Docker 로 연 포트도 보호. `security_whitelist_ips` 로 관리자 IP 제외 |
 | 업데이트 | unattended-upgrades 로 보안 업데이트 자동 설치 (`security_auto_reboot` 로 자동 재부팅) |
 
 **잠김 방지**: 비밀번호 로그인을 막으려면 `deploy_user_ssh_keys` 가 있어야 하고, root 로그인을 막으려면 Ansible 이 root 가 아닌 계정으로 접속해야 합니다. 조건이 안 맞으면 실행 전에 중단합니다. 비밀번호 로그인을 막기 전에 **인벤토리를 SSH 키 접속(`ansible_user=manager`, `ansible_ssh_private_key_file=...`)으로 바꾸세요.**

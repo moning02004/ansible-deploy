@@ -1,0 +1,20 @@
+crowdsec_version: "v1.8.2"                 # https://hub.docker.com/r/crowdsecurity/crowdsec
+crowdsec_dir: /opt/crowdsec
+crowdsec_lapi_port: 8180                   # 127.0.0.1 에만 (호스트의 방화벽 차단기가 접속). 8080 은 wharfline 과 겹침
+crowdsec_collections:
+  - crowdsecurity/linux
+  - crowdsecurity/sshd
+  - crowdsecurity/traefik                   # 03/04/05/07 의 Traefik 액세스 로그
+  - crowdsecurity/http-cve
+  - crowdsecurity/base-http-scenarios
+# 읽을 로그 (호스트 /var/log 를 /var/log/host 로 마운트)
+crowdsec_acquisitions:
+  - { path: /var/log/host/auth.log, type: syslog }
+  - { path: /var/log/host/traefik/access.log, type: traefik }
+# 차단하지 않을 관리자 IP / CIDR
+crowdsec_whitelist: "{{ security_whitelist_ips | default([]) }}"
+# CrowdSec 콘솔(app.crowdsec.net) 연결 키. 비우면 연결하지 않음
+crowdsec_enroll_key: ""
+# 방화벽 차단기 (호스트 패키지: iptables 를 직접 다뤄야 해서 컨테이너로 두지 않음)
+crowdsec_bouncer_chains: [INPUT, DOCKER-USER]   # DOCKER-USER: Docker 로 연 포트도 차단
+crowdsec_bouncer_key: ""                    # 비우면 서버에서 한 번 만들어 /opt/crowdsec/.env 에 보관

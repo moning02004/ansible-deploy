@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+name: orca/whitelist
+description: "관리자 IP 는 차단하지 않음"
+whitelist:
+  reason: "orca admin whitelist"
+  ip:
+{% for w in crowdsec_whitelist if '/' not in w %}
+    - "{{ w }}"
+{% else %}
+    []
+{% endfor %}
+  cidr:
+{% for w in crowdsec_whitelist if '/' in w %}
+    - "{{ w }}"
+{% else %}
+    []
+{% endfor %}

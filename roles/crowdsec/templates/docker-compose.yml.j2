@@ -1,0 +1,36 @@
+# {{ ansible_managed }}
+name: crowdsec
+
+services:
+  crowdsec:
+    image: crowdsecurity/crowdsec:{{ crowdsec_version }}
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      COLLECTIONS: "{{ crowdsec_collections | join(' ') }}"
+      BOUNCER_KEY_host_firewall: ${CROWDSEC_BOUNCER_KEY:?}
+{% if crowdsec_enroll_key %}
+      ENROLL_KEY: ${CROWDSEC_ENROLL_KEY}
+      ENROLL_INSTANCE_NAME: "{{ inventory_hostname }}"
+{% endif %}
+    ports:
+      - "127.0.0.1:{{ crowdsec_lapi_port }}:8080"
+    volumes:
+      - ./acquis.d:/etc/crowdsec/acquis.d:ro
+      - ./whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/orca-whitelist.yaml:ro
+      - crowdsec_config:/etc/crowdsec
+      - crowdsec_data:/var/lib/crowdsec/data
+      - /var/log:/var/log/host:ro
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  crowdsec_config:
+  crowdsec_data:

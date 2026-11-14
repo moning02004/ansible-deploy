@@ -1,12 +1,17 @@
-# 08. security — 방화벽 규칙 재적용 + fail2ban + SSH 강화 + 보안 업데이트 자동 설치
+# 08. security — 방화벽 규칙 재적용 + CrowdSec + SSH 강화 + 보안 업데이트 자동 설치
 #   모든 서버에 적용 (단독 실행용). 허용 IP 를 바꿨을 때도 이것만 다시 돌리면 됩니다.
+#
+#   CrowdSec: 엔진은 Docker(/opt/crowdsec), 차단기는 호스트 패키지(iptables 를 직접 다뤄야 해서)
+#     - SSH 로그(auth.log) + Traefik 액세스 로그로 공격 탐지, 커뮤니티 차단 목록 공유
+#     - INPUT 과 DOCKER-USER 체인 모두에서 차단 → Docker 로 연 포트도 보호
 #
 # 실행:
 #   ansible-playbook -i inventory/all.ini.vault 08-security.yaml --vault-password-file vault_password.txt
-#   방화벽만: --tags firewall     SSH/fail2ban 만: --tags security
+#   방화벽만: --tags firewall     SSH/업데이트만: --tags security     CrowdSec 만: --tags crowdsec
 #
 # ⚠️ security_disable_password_auth: true 로 하기 전에 인벤토리를 SSH 키 접속으로 바꾸세요
-- name: "08 security | firewall + fail2ban + ssh hardening"
+# ⚠️ 관리자 IP 는 security_whitelist_ips 에 넣어 CrowdSec 이 차단하지 않게 하세요
+- name: "08 security | firewall + CrowdSec + ssh hardening"
   hosts: "{{ security_hosts | default('all') }}"
   become: true
 
@@ -14,3 +19,4 @@
     - { role: firewall,        tags: [firewall] }
     - { role: docker_firewall, tags: [firewall] }   # 06/09 가 남긴 rules.d 를 다시 적용
     - { role: security,        tags: [security] }
+    - { role: crowdsec,        tags: [crowdsec] }

@@ -2,7 +2,7 @@
 - name: "verify | 08 security"
   hosts: all
   become: true
-  gather_facts: false
+  gather_facts: true
 
   tasks:
     - name: Effective sshd settings
@@ -19,24 +19,93 @@
       ansible.builtin.command: systemctl is-active ssh
       changed_when: false
 
-    - name: fail2ban sshd jail is active
-      ansible.builtin.command: fail2ban-client status sshd
-      register: jail
+    - name: fail2ban is removed
+      ansible.builtin.command: dpkg-query -W -f='${Status}' fail2ban
+      register: f2b
       changed_when: false
-      failed_when: "'Currently banned' not in jail.stdout"
+      failed_when: "'install ok installed' in f2b.stdout"
 
-    - name: fail2ban can ban and unban
+    - name: CrowdSec engine is healthy and the host bouncer is registered
       ansible.builtin.shell: |
-        fail2ban-client set sshd banip 203.0.113.9 >/dev/null
-        fail2ban-client status sshd | grep -q 203.0.113.9
-        fail2ban-client set sshd unbanip 203.0.113.9 >/dev/null
+        docker inspect -f '{{ "{{" }}.State.Health.Status{{ "}}" }}' crowdsec
+        docker exec crowdsec cscli bouncers list -o raw
+        systemctl is-active crowdsec-firewall-bouncer
+      register: cs
+      changed_when: false
+      until: "cs.stdout_lines[0] == 'healthy' and 'host_firewall' in cs.stdout and cs.stdout_lines[-1] == 'active'"
+      retries: 12
+      delay: 5
+
+    - name: Bouncer hooks INPUT and DOCKER-USER
+      ansible.builtin.shell: iptables -S INPUT; iptables -S DOCKER-USER
+      register: hooks
+      changed_when: false
+      until: hooks.stdout | regex_findall('CROWDSEC', ignorecase=True) | length >= 2
+      retries: 6
+      delay: 5
+
+    - name: Simulate SSH brute force from 203.0.113.50 (via syslog)
+      ansible.builtin.shell: |
+        for i in $(seq 10); do
+          logger -p auth.info -t 'sshd[4242]' "Failed password for invalid user admin$i from 203.0.113.50 port 5$i ssh2"
+        done
       changed_when: false
 
-    - name: Admin IP is ignored
-      ansible.builtin.command: fail2ban-client get sshd ignoreip
-      register: ign
+    - name: Simulate SSH failures from whitelisted 192.0.2.10
+      ansible.builtin.shell: |
+        for i in $(seq 10); do
+          logger -p auth.info -t 'sshd[4243]' "Failed password for invalid user admin$i from 192.0.2.10 port 6$i ssh2"
+        done
       changed_when: false
-      failed_when: "'192.0.2.10' not in ign.stdout"
+
+    - name: Attacker gets a ban decision and is in the firewall
+      ansible.builtin.shell: |
+        docker exec crowdsec cscli decisions list -i 203.0.113.50 -o raw | grep -c ban || true
+        ipset list 2>/dev/null | grep -c '203.0.113.50' || true
+      register: ban
+      changed_when: false
+      until: ban.stdout_lines[0] | int > 0 and ban.stdout_lines[1] | int > 0
+      retries: 12
+      delay: 5
+
+    - name: Whitelisted admin IP is not banned
+      ansible.builtin.command: docker exec crowdsec cscli decisions list -i 192.0.2.10 -o raw
+      register: wl
+      changed_when: false
+      failed_when: "'ban' in wl.stdout"
+
+    - name: Start a test service on a Docker-published port (8099)
+      ansible.builtin.command: docker run -d --rm --name verify-http -p 8099:80 busybox:1.37 httpd -f -p 80 -h /tmp
+      changed_when: false
+
+    - name: Outside client can reach 8099 before a ban
+      ansible.builtin.command: docker run --rm busybox:1.37 nc -z -w 3 {{ ansible_default_ipv4.address }} 8099
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      register: before
+      until: before.rc == 0
+      retries: 5
+      delay: 2
+
+    - name: Ban the outside client network
+      ansible.builtin.shell: docker exec crowdsec cscli decisions add --range 172.17.0.0/16 --duration 5m --reason verify && sleep 15
+      changed_when: false
+
+    - name: Banned client is blocked even on a Docker-published port
+      ansible.builtin.command: docker run --rm busybox:1.37 nc -z -w 3 {{ ansible_default_ipv4.address }} 8099
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      register: after
+      failed_when: after.rc == 0
+
+    - name: Remove test ban and service
+      ansible.builtin.shell: |
+        docker exec crowdsec cscli decisions delete --range 172.17.0.0/16
+        docker exec crowdsec cscli decisions delete --ip 203.0.113.50
+        docker rm -f verify-http
+      changed_when: false
 
     - name: Automatic security updates enabled
       ansible.builtin.shell: apt-config dump | grep -E '^APT::Periodic::Unattended-Upgrade "1"'

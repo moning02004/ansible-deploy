@@ -1,0 +1,13 @@
+# group_vars/all/vault.yaml 의 평문 예시 (실제 파일은 ansible-vault로 암호화)
+#   편집: ansible-vault edit group_vars/all/vault.yaml --vault-password-file vault_password.txt
+
+# 01 base
+deploy_user: manager
+deploy_user_ssh_keys:
+  - "ssh-ed25519 AAAA... me@laptop"
+# common_apt_upgrade: true
+# firewall_allowed_tcp_ports: [80, 443]
+
+# 08 middleware
+rabbitmq_user: "admin"
+rabbitmq_password: "password!2"

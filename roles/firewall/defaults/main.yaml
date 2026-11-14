@@ -1,0 +1,6 @@
+firewall_enabled: true
+firewall_ssh_port: "{{ ansible_port | default(22) }}"
+# 모두에게 여는 TCP 포트 (서비스 role들은 자기 포트를 직접 엽니다)
+firewall_allowed_tcp_ports: []
+# 출발지 제한 규칙. 예) - { port: 5432, from: 10.0.0.0/24 }
+firewall_rules: []

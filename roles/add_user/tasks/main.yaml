@@ -1,19 +1,25 @@
 - name: Ensure deploy user exists
-  user:
+  ansible.builtin.user:
     name: "{{ deploy_user }}"
-    shell: /bin/bash
-    create_home: yes
-
-- name: Ensure git is installed (Debian)
-  apt:
-    name: git
+    shell: "{{ deploy_user_shell }}"
+    create_home: true
     state: present
-  when: ansible_os_family == "Debian"
 
-- name: Ensure parent directory exists
-  file:
-    path: "{{ dest_path | dirname }}"
-    state: directory
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0755'
+- name: Register SSH public keys
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ deploy_user_ssh_keys }}"
+  loop_control:
+    label: "{{ item | truncate(40) }}"
+
+- name: Allow passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ deploy_user }}"
+    content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+  when: deploy_user_sudo_nopasswd | bool

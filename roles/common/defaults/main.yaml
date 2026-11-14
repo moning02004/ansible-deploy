@@ -1,0 +1,13 @@
+common_timezone: Asia/Seoul
+common_hostname: ""            # host_vars에서 지정. 비우면 변경하지 않음
+common_apt_upgrade: false      # true면 설치된 패키지 safe upgrade
+common_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - vim
+  - htop
+  - jq
+  - unzip
+  - tzdata

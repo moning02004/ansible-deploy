@@ -1,0 +1,17 @@
+# 01. base — 모든 서버의 공통 바닥
+#   공통 설정(패키지/타임존) → deploy 유저 → 방화벽(ufw) → Docker → docker rollout
+#
+# 실행:
+#   ansible-playbook -i inventory/all.ini.vault 01-base.yaml --vault-password-file vault_password.txt
+#   특정 서버만:   --limit server1
+#   일부만:        --tags docker   (common / user / firewall / docker / rollout)
+- name: "01 base | 기본 서버 구성"
+  hosts: all
+  become: true
+
+  roles:
+    - { role: common,         tags: [common] }
+    - { role: add_user,       tags: [user] }
+    - { role: firewall,       tags: [firewall] }
+    - { role: docker,         tags: [docker] }
+    - { role: docker_rollout, tags: [docker, rollout] }

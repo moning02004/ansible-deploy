@@ -1,0 +1,21 @@
+- name: Create docker cli-plugins directory
+  ansible.builtin.file:
+    path: "{{ docker_rollout_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Install docker-rollout {{ docker_rollout_version }}
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/wowu/docker-rollout/{{ docker_rollout_version }}/docker-rollout"
+    dest: "{{ docker_rollout_path }}"
+    mode: "0755"
+    force: true
+
+- name: Verify docker rollout
+  ansible.builtin.command: docker rollout --version
+  register: rollout_ver
+  changed_when: false
+
+- name: Show docker rollout version
+  ansible.builtin.debug:
+    msg: "{{ rollout_ver.stdout }}"

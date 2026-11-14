@@ -1,0 +1,12 @@
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+docker_users:
+  - "{{ deploy_user }}"
+docker_log_max_size: 10m
+docker_log_max_file: "3"
+# daemon.json에 추가로 합칠 옵션
+docker_daemon_options: {}

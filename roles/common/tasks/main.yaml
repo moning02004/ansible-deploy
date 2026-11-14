@@ -1,0 +1,29 @@
+- name: Check supported OS
+  ansible.builtin.assert:
+    that: ansible_os_family == "Debian"
+    fail_msg: "Ubuntu/Debian 계열만 지원합니다 (현재: {{ ansible_distribution }})"
+    quiet: true
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Upgrade installed packages
+  ansible.builtin.apt:
+    upgrade: safe
+  when: common_apt_upgrade | bool
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ common_hostname }}"
+  when: common_hostname | length > 0

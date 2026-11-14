@@ -1,4 +1,5 @@
-repo_url: "https://github.com/moning02004/install-docker.git"
-dest_path: "/home/manager/install-docker"
-repo_version: HEAD
-deploy_user: "manager"
+deploy_user: manager
+deploy_user_shell: /bin/bash
+deploy_user_sudo_nopasswd: true
+# 등록할 SSH 공개키 목록. 예) "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+deploy_user_ssh_keys: []

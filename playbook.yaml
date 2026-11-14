@@ -1,9 +1,0 @@
-- name: Set up Server
-  hosts: all
-  become: yes
-  remote_user: "{{ deploy_user }}"
-
-  roles:
-    - add_user
-    - install_docker
-    - install_rabbitmq

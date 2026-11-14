@@ -1,0 +1,4 @@
+# 백업할 서비스(postgres, rabbitmq, redis)를 띄우고 표시 데이터를 넣음
+- import_playbook: ../../05-postgres.yaml
+- import_playbook: ../../08-middleware.yaml
+- import_playbook: seed.yaml

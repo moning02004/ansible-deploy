@@ -1,0 +1,81 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# 이 서버에서 실행 중인 서비스를 감지해서 백업합니다.
+set -euo pipefail
+[ -f /etc/orca-backup.env ] && set -a && . /etc/orca-backup.env && set +a
+
+BASE="{{ backup_dir }}"
+TS="$(date +%Y%m%d-%H%M%S)"
+OUT="$BASE/$TS"
+umask 077
+mkdir -p "$OUT"
+chmod 700 "$BASE"
+
+log() { echo "[$(date +%T)] $*"; }
+running() { [ "$(docker inspect -f '{{ '{{' }}.State.Running{{ '}}' }}' "$1" 2>/dev/null)" = "true" ]; }
+vol_exists() { docker volume inspect "$1" >/dev/null 2>&1; }
+vol_tar() { docker run --rm -v "$1":/v:ro busybox:1.37 tar czf - -C /v . > "$2"; }
+
+# 05 postgres
+if running postgres; then
+  log "postgres: pg_dumpall"
+  docker exec postgres pg_dumpall -U postgres --clean --if-exists | gzip > "$OUT/postgres-all.sql.gz"
+fi
+
+# 02 gitea (DB + 저장소/설정 볼륨)
+if running gitea-db; then
+  log "gitea: pg_dump + data volume"
+  docker exec gitea-db pg_dump -U gitea -Fc gitea > "$OUT/gitea-db.dump"
+  vol_exists gitea_gitea_data && vol_tar gitea_gitea_data "$OUT/gitea-data.tar.gz"
+fi
+
+# wharfline (DB. 마스터 키는 vault 에 따로 보관)
+if [ -f /opt/wharfline/docker-compose.yml ] && running wharfline-db-1; then
+  log "wharfline: pg_dump"
+  docker exec wharfline-db-1 pg_dump -U wharfline -Fc wharfline > "$OUT/wharfline-db.dump"
+fi
+
+# 03 gitlab (gitlab-backup + secrets)
+if running gitlab; then
+  log "gitlab: gitlab-backup create"
+  docker exec gitlab gitlab-backup create BACKUP="orca-$TS" STRATEGY=copy CRON=1 >/dev/null
+  docker cp "gitlab:/var/opt/gitlab/backups/orca-${TS}_gitlab_backup.tar" "$OUT/gitlab_backup.tar"
+  docker exec gitlab rm -f "/var/opt/gitlab/backups/orca-${TS}_gitlab_backup.tar"
+  docker exec gitlab tar czf - -C /etc/gitlab gitlab-secrets.json gitlab.rb > "$OUT/gitlab-config.tar.gz"
+fi
+
+# 08 rabbitmq (유저/큐/익스체인지 정의)
+if running rabbitmq; then
+  log "rabbitmq: export_definitions"
+  docker exec rabbitmq rabbitmqctl -q export_definitions - > "$OUT/rabbitmq-definitions.json"
+fi
+
+# 08 redis (RDB 스냅샷)
+if running redis; then
+  log "redis: SAVE"
+  docker exec redis redis-cli save >/dev/null
+  docker cp redis:/data/dump.rdb "$OUT/redis-dump.rdb"
+fi
+
+{% if backup_include_configs %}
+# 설정 파일
+if compgen -G "/opt/*/docker-compose.yml" >/dev/null; then
+  log "configs: /opt/*"
+  tar czf "$OUT/opt-configs.tar.gz" --ignore-failed-read -C /opt \
+    $(cd /opt && ls -d */docker-compose.yml */docker-compose.override.yml */.env */*.env */prometheus.yml */secrets 2>/dev/null) || true
+fi
+{% endif %}
+
+(cd "$OUT" && ls -la > MANIFEST && sha256sum $(ls | grep -v MANIFEST) >> MANIFEST 2>/dev/null || true)
+ln -sfn "$OUT" "$BASE/latest"
+
+# 보관 기간이 지난 백업 삭제
+find "$BASE" -mindepth 1 -maxdepth 1 -type d -mtime +{{ backup_keep_days }} -print -exec rm -rf {} +
+
+{% if backup_restic_repository %}
+log "restic: backup → {{ backup_restic_repository }}"
+restic backup "$OUT" --tag orca --host "{{ inventory_hostname }}" --quiet
+restic forget --tag orca --host "{{ inventory_hostname }}" {{ backup_restic_forget }} --prune --quiet
+{% endif %}
+
+log "done: $OUT ($(du -sh "$OUT" | cut -f1))"

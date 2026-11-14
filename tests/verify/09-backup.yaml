@@ -1,0 +1,65 @@
+# 09-backup 결과 점검
+- name: "verify | 09 backup"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Backup timer is enabled and scheduled
+      ansible.builtin.shell: systemctl is-enabled orca-backup.timer && systemctl list-timers --all | grep -q orca-backup.timer
+      changed_when: false
+
+    - name: Create an expired backup directory
+      ansible.builtin.shell: mkdir -p /var/backups/orca/20200101-000000 && touch -d '30 days ago' /var/backups/orca/20200101-000000
+      changed_when: false
+
+    - name: Run backup
+      ansible.builtin.command: /usr/local/sbin/orca-backup
+      register: run
+      changed_when: false
+
+    - name: Show backup log
+      ansible.builtin.debug:
+        msg: "{{ run.stdout_lines }}"
+
+    - name: Backup contains every detected service
+      ansible.builtin.shell: |
+        set -e
+        cd /var/backups/orca/latest
+        zcat postgres-all.sql.gz | grep -q 'marker-v1'
+        grep -q '"orders"' rabbitmq-definitions.json
+        grep -q '"{{ rabbitmq_user }}"' rabbitmq-definitions.json
+        test -s redis-dump.rdb
+        tar tzf opt-configs.tar.gz | grep -q 'postgres/.env'
+        tar tzf opt-configs.tar.gz | grep -q 'middleware/docker-compose.yml'
+        grep -q sha256 MANIFEST || grep -q postgres-all MANIFEST
+      changed_when: false
+
+    - name: Expired backup was removed
+      ansible.builtin.stat:
+        path: /var/backups/orca/20200101-000000
+      register: old
+      failed_when: old.stat.exists
+
+    - name: Backup directory is root-only
+      ansible.builtin.stat:
+        path: /var/backups/orca
+      register: bdir
+      failed_when: bdir.stat.mode != '0700'
+
+    - name: restic snapshot exists
+      ansible.builtin.shell: set -a; . /etc/orca-backup.env; set +a; restic snapshots --json --tag orca
+      register: snaps
+      changed_when: false
+      failed_when: (snaps.stdout | from_json | length) < 1
+
+    - name: "--tags now works"
+      ansible.builtin.command: >-
+        ansible-playbook -i tests/inventory.ini -e @tests/vars.yaml 09-backup.yaml --tags now
+      delegate_to: localhost
+      args:
+        chdir: "{{ playbook_dir }}/../.."   # 저장소 루트
+      become: false
+      register: nowrun
+      changed_when: false
+      failed_when: nowrun.rc != 0 or 'done:' not in nowrun.stdout

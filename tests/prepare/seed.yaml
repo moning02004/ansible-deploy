@@ -1,0 +1,22 @@
+# 복구 검증용 표시 데이터 (value=v1)
+- name: "prepare | seed marker data"
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: postgres marker
+      ansible.builtin.command: >-
+        docker exec postgres psql -U postgres -d appdb -c
+        "CREATE TABLE IF NOT EXISTS marker(v text); TRUNCATE marker; INSERT INTO marker VALUES ('marker-v1')"
+    - name: redis marker
+      ansible.builtin.command: docker exec redis redis-cli set marker v1
+    - name: rabbitmq durable queue
+      ansible.builtin.uri:
+        url: http://127.0.0.1:15672/api/queues/%2F/orders
+        method: PUT
+        user: "{{ rabbitmq_user }}"
+        password: "{{ rabbitmq_password }}"
+        force_basic_auth: true
+        body_format: json
+        body: { durable: true }
+        status_code: [201, 204]

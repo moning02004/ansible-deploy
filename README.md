@@ -12,7 +12,7 @@
 | 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ✅ |
 | 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ✅ |
 | 08 | `08-middleware.yaml` | RabbitMQ + Redis | ✅ |
-| 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ⬜ |
+| 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ✅ |
 | 10 | `10-restore.yaml` | 백업 파일로 복구 | ⬜ |
 
 ## 환경
@@ -168,3 +168,25 @@ Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 05/08 은 `DOCK
 - RabbitMQ 관리 화면은 127.0.0.1:15672 에만 → `ssh -L 15672:localhost:15672 manager@서버` 후 http://localhost:15672
 - Redis: 비밀번호 필수, AOF 켜짐, `redis_maxmemory`(256mb) + allkeys-lru, `vm.overcommit_memory=1`
 - `middleware_rabbitmq_enabled` / `middleware_redis_enabled` 로 하나만 쓸 수 있음
+
+## 09-backup
+서버에서 **실행 중인 서비스를 자동 감지**해서 백업합니다.
+
+| 서비스 | 백업 파일 |
+|---|---|
+| postgres (05) | `postgres-all.sql.gz` (pg_dumpall) |
+| gitea (02) | `gitea-db.dump`, `gitea-data.tar.gz` (저장소, 설정) |
+| wharfline | `wharfline-db.dump` (마스터 키는 vault 에 따로) |
+| gitlab (03) | `gitlab_backup.tar`, `gitlab-config.tar.gz` (gitlab-secrets.json 포함) |
+| rabbitmq (08) | `rabbitmq-definitions.json` (유저, 큐, 익스체인지) |
+| redis (08) | `redis-dump.rdb` |
+| 공통 | `opt-configs.tar.gz` (/opt/*/docker-compose.yml, .env 등) |
+
+```bash
+ansible-playbook ... 09-backup.yaml                          # 매일 03:00 자동 백업 설치 (systemd timer)
+ansible-playbook ... 09-backup.yaml --tags now               # 지금 즉시 백업
+ansible-playbook ... 09-backup.yaml --tags now -e backup_fetch=true   # + backups/<호스트>/ 로 가져오기
+```
+- 위치: `/var/backups/orca/<시각>/` (`latest` 링크), `backup_keep_days`(7일) 지나면 삭제
+- 서버에서 직접: `sudo orca-backup`, 로그: `journalctl -u orca-backup`
+- **외부 저장소**: `backup_restic_repository` 를 지정하면 restic 으로 S3 / SFTP / NAS 에도 보냅니다 (일 7, 주 4, 월 6 보관). `backup_restic_password` 를 잃으면 풀 수 없습니다.

@@ -1,0 +1,15 @@
+backup_dir: /var/backups/orca
+backup_keep_days: 7
+backup_schedule: "*-*-* 03:00:00"          # systemd OnCalendar 형식
+backup_include_configs: true               # /opt/*/docker-compose.yml, .env 등 (비밀 값 포함 → 백업 디렉터리는 root 0700)
+
+# 외부 저장소 (restic). 비우면 서버 로컬에만 보관
+#   예) s3:https://kr.object.ncloudstorage.com/my-bucket/orca   /   sftp:user@nas:/backups/orca   /   /mnt/nas/orca
+backup_restic_repository: ""
+backup_restic_password: ""                 # vault. 잃으면 restic 백업을 풀 수 없음
+backup_restic_env: {}                      # 예) { AWS_ACCESS_KEY_ID: ..., AWS_SECRET_ACCESS_KEY: ... }
+backup_restic_forget: "--keep-daily 7 --keep-weekly 4 --keep-monthly 6"
+
+# --tags now 일 때 컨트롤러로 가져오기
+backup_fetch: false
+backup_fetch_dir: "{{ playbook_dir }}/backups"

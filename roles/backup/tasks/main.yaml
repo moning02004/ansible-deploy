@@ -1,0 +1,131 @@
+# ---------------- 스케줄 설치 (기본) ----------------
+- name: Install restic
+  ansible.builtin.apt:
+    name: restic
+    state: present
+  when: backup_restic_repository | length > 0
+  tags: [schedule]
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: "{{ backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [schedule]
+
+- name: Write restic environment
+  ansible.builtin.copy:
+    dest: /etc/orca-backup.env
+    content: |
+      {% if backup_restic_repository %}
+      RESTIC_REPOSITORY={{ backup_restic_repository }}
+      RESTIC_PASSWORD={{ backup_restic_password }}
+      {% for k, v in backup_restic_env.items() %}
+      {{ k }}={{ v }}
+      {% endfor %}
+      {% endif %}
+    mode: "0600"
+  no_log: true
+  tags: [schedule]
+
+- name: Initialize restic repository
+  ansible.builtin.shell: |
+    set -a; . /etc/orca-backup.env; set +a
+    restic cat config >/dev/null 2>&1 && echo exists || restic init
+  register: restic_init
+  changed_when: "'created restic repository' in restic_init.stdout"
+  when: backup_restic_repository | length > 0
+  no_log: true
+  tags: [schedule]
+
+- name: Install backup script
+  ansible.builtin.template:
+    src: orca-backup.sh.j2
+    dest: /usr/local/sbin/orca-backup
+    mode: "0750"
+  tags: [schedule]
+
+- name: Install systemd service and timer
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item.name }}"
+    content: "{{ item.content }}"
+    mode: "0644"
+  loop:
+    - name: orca-backup.service
+      content: |
+        # Ansible 관리 파일 — 직접 수정하지 마세요
+        [Unit]
+        Description=orca backup
+        After=docker.service
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/sbin/orca-backup
+        Nice=10
+        IOSchedulingClass=idle
+    - name: orca-backup.timer
+      content: |
+        # Ansible 관리 파일 — 직접 수정하지 마세요
+        [Unit]
+        Description=Daily orca backup
+        [Timer]
+        OnCalendar={{ backup_schedule }}
+        RandomizedDelaySec=10m
+        Persistent=true
+        [Install]
+        WantedBy=timers.target
+  loop_control:
+    label: "{{ item.name }}"
+  register: backup_units
+  tags: [schedule]
+
+- name: Enable backup timer
+  ansible.builtin.systemd_service:
+    name: orca-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: "{{ backup_units is changed }}"
+  tags: [schedule]
+
+# ---------------- 즉시 백업 (--tags now) ----------------
+- name: Check backup script is installed
+  ansible.builtin.stat:
+    path: /usr/local/sbin/orca-backup
+  register: backup_script
+  tags: [now, never]
+
+- name: Fail if schedule was never installed
+  ansible.builtin.assert:
+    that: backup_script.stat.exists
+    fail_msg: "백업 스크립트가 없습니다. 먼저 태그 없이 09-backup.yaml 을 실행하세요"
+    quiet: true
+  tags: [now, never]
+
+- name: Run backup now
+  ansible.builtin.command: /usr/local/sbin/orca-backup
+  register: backup_run
+  tags: [now, never]
+
+- name: Show backup log
+  ansible.builtin.debug:
+    msg: "{{ backup_run.stdout_lines }}"
+  tags: [now, never]
+
+- name: Find files of this backup
+  ansible.builtin.find:
+    paths: "{{ backup_dir }}/latest/"
+  register: backup_files
+  when: backup_fetch | bool
+  tags: [now, never]
+
+- name: Fetch backup to controller
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "{{ backup_fetch_dir }}/{{ inventory_hostname }}/{{ backup_run.stdout_lines[-1] | regex_search('orca/([0-9-]+)', '\\1') | first }}/"
+    flat: true
+  loop: "{{ backup_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: backup_fetch | bool
+  tags: [now, never]

@@ -62,3 +62,8 @@ middleware_allowed_sources: []             # 예) [10.0.0.0/24]
 # backup_restic_repository: "s3:https://kr.object.ncloudstorage.com/my-bucket/orca"
 # backup_restic_password: "<random. 잃으면 복구 불가>"
 # backup_restic_env: { AWS_ACCESS_KEY_ID: "...", AWS_SECRET_ACCESS_KEY: "..." }
+
+# ---------- 11 kubernetes (필수 값 없음, 원격 kubectl 쓸 때만) ----------
+# k8s_api_allowed_sources: [203.0.113.0/24]   # 6443 을 열 출발지
+# k8s_api_cert_sans: [k8s.example.com]        # API 인증서에 넣을 도메인/IP
+# k8s_ingress_enabled: false                  # 80/443 을 다른 서비스가 쓰면

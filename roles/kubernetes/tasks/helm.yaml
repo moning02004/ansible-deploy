@@ -1,0 +1,28 @@
+- name: Check installed helm version
+  ansible.builtin.command: helm version --template '{{ "{{" }}.Version{{ "}}" }}'
+  register: k8s_helm_current
+  changed_when: false
+  failed_when: false
+
+- name: Install helm {{ k8s_helm_version }}
+  when: k8s_helm_current.stdout != k8s_helm_version
+  block:
+    - name: Download helm
+      ansible.builtin.get_url:
+        url: "https://get.helm.sh/helm-{{ k8s_helm_version }}-linux-{{ k8s_arch }}.tar.gz"
+        checksum: "sha256:https://get.helm.sh/helm-{{ k8s_helm_version }}-linux-{{ k8s_arch }}.tar.gz.sha256sum"
+        dest: "/tmp/helm-{{ k8s_helm_version }}.tar.gz"
+        mode: "0644"
+
+    - name: Install helm binary
+      ansible.builtin.unarchive:
+        src: "/tmp/helm-{{ k8s_helm_version }}.tar.gz"
+        dest: /usr/local/bin
+        remote_src: true
+        extra_opts: [--strip-components=1, "linux-{{ k8s_arch }}/helm"]
+        mode: "0755"
+
+    - name: Remove helm archive
+      ansible.builtin.file:
+        path: "/tmp/helm-{{ k8s_helm_version }}.tar.gz"
+        state: absent

@@ -1,0 +1,185 @@
+# 11-kubernetes 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 11 kubernetes"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    smoke_host: smoke.k8s.test
+    smoke_manifest: |
+      apiVersion: v1
+      kind: Namespace
+      metadata: { name: smoke }
+      ---
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata: { name: data, namespace: smoke }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 16Mi } }
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: web, namespace: smoke }
+      spec:
+        selector: { matchLabels: { app: web } }
+        template:
+          metadata: { labels: { app: web } }
+          spec:
+            initContainers:
+              - name: init
+                image: busybox:1.37
+                command: [sh, -c, 'echo k8s-smoke-ok > /data/index.html']
+                volumeMounts: [{ name: data, mountPath: /data }]
+            containers:
+              - name: web
+                image: busybox:1.37
+                command: [httpd, -f, -p, "8080", -h, /data]
+                ports: [{ containerPort: 8080 }]
+                readinessProbe: { httpGet: { path: /, port: 8080 } }
+                volumeMounts: [{ name: data, mountPath: /data }]
+            volumes:
+              - name: data
+                persistentVolumeClaim: { claimName: data }
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata: { name: web, namespace: smoke }
+      spec:
+        selector: { app: web }
+        ports: [{ port: 80, targetPort: 8080 }]
+      ---
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata: { name: web, namespace: smoke }
+      spec:
+        rules:
+          - host: smoke.k8s.test
+            http:
+              paths:
+                - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 80 } } } }
+
+  tasks:
+    - name: Server version matches k8s_version
+      ansible.builtin.command: kubectl version -o json
+      register: kver
+      changed_when: false
+      failed_when: (kver.stdout | from_json).serverVersion.gitVersion != 'v' ~ (k8s_version | default('1.37.2'))
+
+    - name: Kubernetes packages are held
+      ansible.builtin.command: apt-mark showhold
+      register: holds
+      changed_when: false
+      failed_when: holds.stdout_lines | intersect(['kubelet', 'kubeadm', 'kubectl']) | length != 3
+
+    - name: Node is Ready
+      ansible.builtin.command: kubectl wait --for=condition=Ready node --all --timeout=120s
+      changed_when: false
+
+    - name: All system pods are Ready
+      ansible.builtin.command: >-
+        kubectl wait --for=condition=Ready pods --all --timeout=300s
+        -n {{ item }}
+      loop: [kube-system, kube-flannel, local-path-storage, traefik]
+      changed_when: false
+
+    - name: Deploy user can use kubectl
+      ansible.builtin.command: kubectl get nodes
+      become_user: "{{ deploy_user }}"
+      changed_when: false
+
+    - name: Docker and Kubernetes share containerd (moby + k8s.io namespaces)
+      ansible.builtin.command: ctr namespaces ls -q
+      register: ns
+      changed_when: false
+      failed_when: "'moby' not in ns.stdout_lines or 'k8s.io' not in ns.stdout_lines"
+
+    - name: Docker still runs containers alongside Kubernetes
+      ansible.builtin.command: docker run --rm alpine:3.22 echo docker-ok
+      register: dk
+      changed_when: false
+      failed_when: "'docker-ok' not in dk.stdout"
+
+    - name: helm is installed
+      ansible.builtin.command: helm version --template '{{ "{{" }}.Version{{ "}}" }}'
+      register: helmv
+      changed_when: false
+      failed_when: helmv.stdout != (k8s_helm_version | default('v4.3.2'))
+
+    - name: metrics-server serves node metrics (kubectl top)
+      ansible.builtin.command: kubectl top node
+      register: top
+      changed_when: false
+      until: top.rc == 0
+      retries: 24
+      delay: 5
+
+    - name: local-path is the default StorageClass
+      ansible.builtin.command: kubectl get sc local-path -o jsonpath='{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}'
+      register: sc
+      changed_when: false
+      failed_when: sc.stdout != 'true'
+
+    - name: Deploy smoke app (PVC + Deployment + Service + Ingress)
+      ansible.builtin.command: kubectl apply -f -
+      args:
+        stdin: "{{ smoke_manifest }}"
+      changed_when: false
+
+    - name: Smoke app is rolled out (PVC bound via local-path)
+      ansible.builtin.command: kubectl -n smoke rollout status deploy/web --timeout=300s
+      changed_when: false
+
+    - name: Smoke app answers through Traefik ingress (hostPort 80)
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}/"
+        headers: { Host: "{{ smoke_host }}" }
+        return_content: true
+      register: smoke
+      until: smoke.status == 200 and 'k8s-smoke-ok' in smoke.content
+      retries: 20
+      delay: 3
+
+    - name: Service DNS works inside the cluster
+      # Pod 안에서 Service 이름(CoreDNS) → ClusterIP(kube-proxy) → Pod 경로 확인
+      ansible.builtin.command: >-
+        kubectl -n smoke exec deploy/web --
+        wget -qO- http://web.smoke.svc.cluster.local/
+      register: dns
+      changed_when: false
+      until: "'k8s-smoke-ok' in dns.stdout"
+      retries: 10
+      delay: 3
+
+    - name: etcd snapshot backup works
+      ansible.builtin.systemd_service:
+        name: k8s-etcd-backup.service
+        state: started
+
+    - name: etcd snapshot file exists
+      ansible.builtin.find:
+        paths: /var/backups/etcd
+        patterns: "etcd-*.db"
+      register: snaps
+      failed_when: snaps.matched < 1
+
+    - name: etcd backup timer is active
+      ansible.builtin.command: systemctl is-active k8s-etcd-backup.timer
+      changed_when: false
+
+    - name: ufw allows Pod network, API port not public
+      ansible.builtin.command: ufw status
+      register: ufw
+      changed_when: false
+      failed_when: >-
+        '10.244.0.0/16' not in ufw.stdout or
+        ufw.stdout is search('^6443\S*\s+ALLOW\s+Anywhere', multiline=True)
+
+    - name: kubeconfig files are private
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/root/.kube/config, "/home/{{ deploy_user }}/.kube/config", /var/backups/etcd]
+      register: perms
+      failed_when: perms.stat.mode not in ['0600', '0700']

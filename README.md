@@ -14,6 +14,7 @@
 | 08 | `08-middleware.yaml` | RabbitMQ + Redis | ✅ |
 | 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ✅ |
 | 10 | `10-restore.yaml` | 백업 파일로 복구 | ✅ |
+| 11 | `11-kubernetes.yaml` | base(Docker) + Kubernetes 단일 노드 (kubeadm, Flannel, Helm, metrics-server, local-path, Traefik ingress, etcd 백업) | ✅ |
 
 ## 환경
 - ansible-core 2.18 이상
@@ -214,3 +215,27 @@ ansible-playbook ... 10-restore.yaml --limit db1 -e restore_confirm=yes -e '{"re
 - 구성 요소: `postgres`, `gitea`, `wharfline`, `gitlab`, `rabbitmq`, `redis`
 - 서비스는 미리 설치돼 있어야 합니다 (새 서버면 01 + 프리셋 먼저)
 - wharfline 은 `wharfline_master_key` 가 백업 당시와 같아야 하고, gitlab 은 `gitlab_version` 이 같아야 합니다
+
+## 11-kubernetes
+Docker(01-base) 위에 **kubeadm 으로 단일 노드 Kubernetes** 를 설치합니다. Docker 와 Kubernetes 가 같은 containerd 를 나눠 써서(Docker: `moby` / k8s: `k8s.io` 네임스페이스) docker compose 서비스와 kubectl/helm 을 한 서버에서 같이 쓸 수 있습니다.
+
+| 구성 | 버전 변수 (기본값) | 설명 |
+|---|---|---|
+| kubeadm / kubelet / kubectl | `k8s_version` 1.37.2 | apt hold 로 고정, 버전을 바꾸면 hold 를 풀고 설치 |
+| containerd (CRI) | Docker 의 containerd.io | CRI 켜기 + `SystemdCgroup = true` |
+| Flannel (CNI) | `k8s_flannel_version` v0.28.10 | Pod 대역 `k8s_pod_subnet` 10.244.0.0/16 |
+| Helm | `k8s_helm_version` v4.3.2 | `/usr/local/bin/helm` |
+| metrics-server | `k8s_metrics_server_version` v0.9.1 | `kubectl top`, HPA |
+| local-path-provisioner | `k8s_local_path_version` v0.0.37 | 기본 StorageClass, 데이터는 `k8s_local_path_dir` |
+| Traefik (ingress) | `k8s_traefik_chart_version` 42.4.0 | 기본 IngressClass, hostPort 로 노드 80/443 수신 |
+| etcd 스냅샷 | — | 매일 03:30 `/var/backups/etcd` (7개 보관, PKI 포함) |
+
+- 인벤토리 `[kubernetes]` 그룹에 적용. control-plane 에도 일반 Pod 가 뜹니다(`k8s_control_plane_schedulable`).
+- 서버에서: `kubectl get pods -A` (deploy 유저도 `~/.kube/config` 로 바로 사용, `k` 별칭 + 자동완성)
+- **원격 kubectl**: `k8s_api_allowed_sources` 에 내 IP 대역, `k8s_api_cert_sans` 에 접속할 도메인/IP 를 넣고 실행 → 서버의 `~/.kube/config` 를 가져와 `server:` 주소만 바꿔 쓰세요. 기본은 6443 을 열지 않습니다.
+- **ingress 예시**: `Ingress` 를 만들고 도메인 DNS 를 서버로 향하게 하면 Traefik 이 80/443 에서 받습니다. ⚠️ hostPort 80/443 을 쓰므로 02-gitea(nginx), 04-app(traefik) 과 같은 서버에 두지 마세요 (`k8s_ingress_enabled: false` 로 끌 수 있음).
+- 방화벽: Pod 대역(10.244.0.0/16) → 노드 허용, ingress 켜면 80/443 허용.
+- 애드온 매니페스트는 `/etc/kubernetes/addons/<이름>/` (kustomization) 에 남고, `kubectl diff` 로 바뀐 게 있을 때만 적용합니다.
+- etcd 수동 백업: `sudo k8s-etcd-backup`, 복구는 [공식 문서](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster) 참고.
+- 테스트(컨테이너)에서는 swap 유지, 커널 모듈 로드 생략, `kube-proxy conntrack.maxPerCore: 0` 을 씁니다 (`tests/vars.yaml`). 실서버에서는 swap 을 끄고 모듈을 로드합니다.
+- 미지원: 멀티 노드(worker join), HA control-plane.

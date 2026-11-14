@@ -20,3 +20,5 @@ server1
 [monitoring]   ; 06  Prometheus + Grafana 를 둘 서버 (exporter 는 모든 서버)
 
 [middleware]   ; 08
+
+[kubernetes]   ; 11  (80/443 을 쓰므로 02/03/04 와 같은 서버에 두지 않기)

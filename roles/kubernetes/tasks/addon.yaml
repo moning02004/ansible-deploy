@@ -1,0 +1,17 @@
+# 애드온 하나 적용: /etc/kubernetes/addons/<name>/ (kustomization) → kubectl diff 로 바뀐 것이 있을 때만 apply
+#   vars: addon_name, addon_ready (rollout status 대상 목록, 예: ["-n kube-system deploy/metrics-server"])
+- name: "{{ addon_name }} | diff"
+  ansible.builtin.command: kubectl diff --server-side --force-conflicts -k /etc/kubernetes/addons/{{ addon_name }}
+  register: addon_diff
+  changed_when: false
+  failed_when: false
+
+- name: "{{ addon_name }} | apply"
+  ansible.builtin.command: kubectl apply --server-side --force-conflicts -k /etc/kubernetes/addons/{{ addon_name }}
+  when: addon_diff.rc != 0
+  changed_when: true
+
+- name: "{{ addon_name }} | wait for rollout"
+  ansible.builtin.command: "kubectl rollout status --timeout=300s {{ item }}"
+  loop: "{{ addon_ready | default([]) }}"
+  changed_when: false

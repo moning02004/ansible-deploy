@@ -1,0 +1,50 @@
+- name: Create etcd backup directory
+  ansible.builtin.file:
+    path: "{{ k8s_etcd_backup_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Install etcd snapshot script
+  ansible.builtin.template:
+    src: etcd-backup.sh.j2
+    dest: /usr/local/sbin/k8s-etcd-backup
+    mode: "0755"
+
+- name: Install etcd backup service and timer
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item.name }}"
+    content: "{{ item.content }}"
+    mode: "0644"
+  loop:
+    - name: k8s-etcd-backup.service
+      content: |
+        # Ansible 관리 파일
+        [Unit]
+        Description=Kubernetes etcd snapshot
+        After=kubelet.service
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/sbin/k8s-etcd-backup
+    - name: k8s-etcd-backup.timer
+      content: |
+        # Ansible 관리 파일
+        [Unit]
+        Description=Daily Kubernetes etcd snapshot
+
+        [Timer]
+        OnCalendar={{ k8s_etcd_backup_on_calendar }}
+        RandomizedDelaySec=10m
+        Persistent=true
+
+        [Install]
+        WantedBy=timers.target
+  loop_control: { label: "{{ item.name }}" }
+  register: k8s_backup_units
+
+- name: Enable etcd backup timer
+  ansible.builtin.systemd_service:
+    name: k8s-etcd-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: "{{ k8s_backup_units.changed }}"

@@ -1,0 +1,173 @@
+- name: Create addon directories
+  ansible.builtin.file:
+    path: "/etc/kubernetes/addons/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: [flannel, metrics-server, local-path, traefik]
+
+# ── CNI: Flannel ───────────────────────────────────────────────
+- name: flannel | download manifest
+  ansible.builtin.get_url:
+    url: "https://github.com/flannel-io/flannel/releases/download/{{ k8s_flannel_version }}/kube-flannel.yml"
+    dest: /etc/kubernetes/addons/flannel/kube-flannel.yml
+    mode: "0644"
+
+- name: flannel | kustomization (Pod 대역)
+  ansible.builtin.copy:
+    dest: /etc/kubernetes/addons/flannel/kustomization.yaml
+    mode: "0644"
+    content: |
+      # Ansible 관리 파일
+      resources: [kube-flannel.yml]
+      patches:
+        - target: { kind: ConfigMap, name: kube-flannel-cfg }
+          patch: |-
+            - op: replace
+              path: /data/net-conf.json
+              value: '{"Network": "{{ k8s_pod_subnet }}", "EnableNFTables": false, "Backend": {"Type": "vxlan"}}'
+
+- name: flannel | apply
+  ansible.builtin.include_tasks: addon.yaml
+  vars:
+    addon_name: flannel
+    addon_ready: ["-n kube-flannel ds/kube-flannel-ds"]
+
+- name: Wait for node Ready
+  ansible.builtin.command: kubectl wait --for=condition=Ready node --all --timeout=300s
+  changed_when: false
+
+- name: Wait for CoreDNS
+  ansible.builtin.command: kubectl -n kube-system rollout status deploy/coredns --timeout=300s
+  changed_when: false
+
+# ── metrics-server ─────────────────────────────────────────────
+- name: metrics-server
+  when: k8s_metrics_server_enabled | bool
+  block:
+    - name: metrics-server | download manifest
+      ansible.builtin.get_url:
+        url: "https://github.com/kubernetes-sigs/metrics-server/releases/download/{{ k8s_metrics_server_version }}/components.yaml"
+        dest: /etc/kubernetes/addons/metrics-server/components.yaml
+        mode: "0644"
+
+    # kubeadm 의 kubelet 인증서는 자체 서명이라 검증 생략 (단일 노드, 클러스터 내부 통신)
+    - name: metrics-server | kustomization
+      ansible.builtin.copy:
+        dest: /etc/kubernetes/addons/metrics-server/kustomization.yaml
+        mode: "0644"
+        content: |
+          # Ansible 관리 파일
+          resources: [components.yaml]
+          patches:
+            - target: { kind: Deployment, name: metrics-server }
+              patch: |-
+                - op: add
+                  path: /spec/template/spec/containers/0/args/-
+                  value: --kubelet-insecure-tls
+
+    - name: metrics-server | apply
+      ansible.builtin.include_tasks: addon.yaml
+      vars:
+        addon_name: metrics-server
+        addon_ready: ["-n kube-system deploy/metrics-server"]
+
+# ── local-path-provisioner (기본 StorageClass) ─────────────────
+- name: local-path
+  when: k8s_local_path_enabled | bool
+  block:
+    - name: local-path | download manifest
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/rancher/local-path-provisioner/{{ k8s_local_path_version }}/deploy/local-path-storage.yaml"
+        dest: /etc/kubernetes/addons/local-path/local-path-storage.yaml
+        mode: "0644"
+
+    - name: local-path | kustomization (기본 StorageClass + 저장 경로)
+      ansible.builtin.copy:
+        dest: /etc/kubernetes/addons/local-path/kustomization.yaml
+        mode: "0644"
+        content: |
+          # Ansible 관리 파일
+          resources: [local-path-storage.yaml]
+          patches:
+            - target: { kind: StorageClass, name: local-path }
+              patch: |-
+                - op: add
+                  path: /metadata/annotations
+                  value: { storageclass.kubernetes.io/is-default-class: "true" }
+            - target: { kind: ConfigMap, name: local-path-config }
+              patch: |-
+                - op: replace
+                  path: /data/config.json
+                  value: '{"nodePathMap": [{"node": "DEFAULT_PATH_FOR_NON_LISTED_NODES", "paths": ["{{ k8s_local_path_dir }}"]}]}'
+
+    - name: local-path | apply
+      ansible.builtin.include_tasks: addon.yaml
+      vars:
+        addon_name: local-path
+        addon_ready: ["-n local-path-storage deploy/local-path-provisioner"]
+
+# ── Traefik ingress ────────────────────────────────────────────
+- name: traefik
+  when: k8s_ingress_enabled | bool
+  block:
+    - name: traefik | values
+      ansible.builtin.copy:
+        dest: /etc/kubernetes/addons/traefik/values.yaml
+        mode: "0644"
+        content: |
+          # Ansible 관리 파일 — LoadBalancer 가 없는 단일 서버라 hostPort 로 노드의 80/443 을 받음
+          deployment:
+            kind: DaemonSet
+          updateStrategy:
+            type: RollingUpdate
+            rollingUpdate: { maxUnavailable: 1, maxSurge: 0 }   # hostPort 는 surge 불가
+          ports:
+            web:
+              hostPort: {{ k8s_ingress_http_port }}
+            websecure:
+              hostPort: {{ k8s_ingress_https_port }}
+          service:
+            spec: { type: ClusterIP }
+          ingressClass:
+            enabled: true
+            isDefaultClass: true
+          providers:
+            kubernetesIngress:
+              publishedService: { enabled: false }
+
+    - name: traefik | render chart {{ k8s_traefik_chart_version }}
+      ansible.builtin.command: >-
+        helm template traefik oci://ghcr.io/traefik/helm/traefik
+        --version {{ k8s_traefik_chart_version }} --namespace traefik --include-crds
+        -f /etc/kubernetes/addons/traefik/values.yaml
+      register: traefik_rendered
+      changed_when: false
+
+    - name: traefik | write manifest
+      ansible.builtin.copy:
+        dest: /etc/kubernetes/addons/traefik/traefik.yaml
+        content: "{{ traefik_rendered.stdout }}\n"
+        mode: "0644"
+
+    - name: traefik | kustomization
+      ansible.builtin.copy:
+        dest: /etc/kubernetes/addons/traefik/kustomization.yaml
+        mode: "0644"
+        content: |
+          # Ansible 관리 파일
+          resources: [namespace.yaml, traefik.yaml]
+
+    - name: traefik | namespace
+      ansible.builtin.copy:
+        dest: /etc/kubernetes/addons/traefik/namespace.yaml
+        mode: "0644"
+        content: |
+          apiVersion: v1
+          kind: Namespace
+          metadata: { name: traefik }
+
+    - name: traefik | apply
+      ansible.builtin.include_tasks: addon.yaml
+      vars:
+        addon_name: traefik
+        addon_ready: ["-n traefik ds/traefik"]

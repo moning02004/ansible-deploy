@@ -10,11 +10,12 @@
 | 04 | `04-gitlab.yaml` | base + Traefik + GitLab CE + gitlab-runner + wharfline | ✅ |
 | 05 | `05-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
 | 06 | `06-postgres.yaml` | base + PostgreSQL | ✅ |
-| 07 | `07-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ✅ |
+| 07 | `07-monitoring.yaml` | Prometheus + Grafana + Alertmanager, 모든 서버에 node-exporter / cAdvisor | ✅ |
 | 08 | `08-security.yaml` | 방화벽 규칙 재적용, CrowdSec, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ✅ |
 | 09 | `09-middleware.yaml` | RabbitMQ + Redis | ✅ |
 | 10 | `10-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ✅ |
 | 11 | `11-restore.yaml` | 백업 파일로 복구 | ✅ |
+| 12 | `12-vpn.yaml` | base + WireGuard VPN (관리자 내부망 접속, 접속 설정 자동 생성) | ✅ |
 
 ## 환경
 - ansible-core 2.18 이상
@@ -239,3 +240,9 @@ ansible-playbook ... 11-restore.yaml --limit db1 -e restore_confirm=yes -e '{"re
 - 구성 요소: `postgres`, `gitea`, `wharfline`, `gitlab`, `rabbitmq`, `redis`
 - 서비스는 미리 설치돼 있어야 합니다 (새 서버면 01 + 프리셋 먼저)
 - wharfline 은 `wharfline_master_key` 가 백업 당시와 같아야 하고, gitlab 은 `gitlab_version` 이 같아야 합니다
+
+## 12-vpn
+- WireGuard (`linuxserver/wireguard`, `/opt/wireguard`), UDP 51820
+- `vpn_peers: [laptop, phone]` 처럼 이름만 적으면 접속 설정을 만들고 `secrets/<호스트>/wireguard/<이름>.conf` 로 가져옵니다 (gitignore). 폰은 `docker exec wireguard /app/show-peer <이름>` 의 QR 코드로.
+- 기본은 split tunnel (`vpn_allowed_ips: 10.13.13.0/24`). 06/09 의 `*_allowed_sources` 에 VPN 대역을 넣으면 DB · 미들웨어를 VPN 으로만 쓸 수 있습니다.
+- 사람을 추가/삭제하려면 `vpn_peers` 를 바꾸고 다시 실행 (기존 키는 유지)

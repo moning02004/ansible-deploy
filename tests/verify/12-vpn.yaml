@@ -1,0 +1,47 @@
+# 12-vpn 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 12 vpn"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: WireGuard interface is up with all peers
+      ansible.builtin.command: docker exec wireguard wg show wg0 peers
+      register: peers
+      changed_when: false
+      until: peers.rc == 0 and peers.stdout_lines | length == 2
+      retries: 15
+      delay: 2
+
+    - name: Server listens on UDP 51820
+      ansible.builtin.command: docker exec wireguard wg show wg0 listen-port
+      register: port
+      changed_when: false
+      failed_when: port.stdout != '51820'
+
+    - name: Peer configs were fetched to the controller
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../secrets/testhost/wireguard/{{ item }}.conf"
+      delegate_to: localhost
+      become: false
+      loop: [laptop, phone]
+      register: fetched
+      failed_when: not fetched.stat.exists
+
+    - name: Peer config points at the server and uses split tunnel
+      ansible.builtin.command: cat {{ playbook_dir }}/../../secrets/testhost/wireguard/laptop.conf
+      delegate_to: localhost
+      become: false
+      register: conf
+      changed_when: false
+      failed_when: >-
+        'Endpoint = vpn.test:51820' not in conf.stdout or
+        'AllowedIPs = 10.13.13.0/24' not in conf.stdout
+
+    - name: Config directory is root-only
+      ansible.builtin.stat:
+        path: /opt/wireguard
+      register: wgdir
+      failed_when: wgdir.stat.mode != '0700'

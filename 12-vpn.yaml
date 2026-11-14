@@ -1,0 +1,21 @@
+# 12. vpn — base + WireGuard (Docker)
+#   인벤토리의 [vpn] 그룹에 적용됩니다.
+#   관리자가 서버 내부망에 접속하는 용도. 06/09 의 allowed_sources 에 VPN 대역을 넣으면
+#   DB · 미들웨어를 인터넷에 열지 않고 VPN 으로만 쓸 수 있습니다.
+#
+# 실행:
+#   ansible-playbook -i inventory/all.ini.vault 12-vpn.yaml --vault-password-file vault_password.txt
+#   → 접속 설정 파일: secrets/<호스트>/wireguard/<이름>.conf  (WireGuard 앱에서 가져오기)
+#   QR 코드(폰): ssh 서버 → docker exec wireguard /app/show-peer <이름>
+#
+# 사람 추가/삭제: vpn_peers 를 바꾸고 다시 실행 (기존 사람의 키는 유지)
+- import_playbook: 01-base.yaml
+  vars:
+    base_hosts: vpn
+
+- name: "12 vpn | WireGuard"
+  hosts: vpn
+  become: true
+
+  roles:
+    - { role: wireguard, tags: [vpn] }

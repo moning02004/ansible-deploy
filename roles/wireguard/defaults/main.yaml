@@ -1,0 +1,10 @@
+wireguard_version: "1.0.20260223-r0-ls130"   # https://hub.docker.com/r/linuxserver/wireguard
+wireguard_dir: /opt/wireguard
+vpn_server_url: auto                 # 클라이언트가 접속할 주소 (도메인/공인 IP). auto: 공인 IP 자동 감지
+vpn_port: 51820                      # UDP
+vpn_peers: [laptop]                  # 접속할 사람/기기 이름 (영문, 숫자)
+vpn_subnet: 10.13.13.0               # VPN 내부 대역 (/24)
+# 클라이언트가 VPN 으로 보낼 대역. 기본은 VPN 대역만(split tunnel). 전체 트래픽: 0.0.0.0/0
+vpn_allowed_ips: "10.13.13.0/24"
+vpn_peer_dns: auto
+vpn_fetch_dir: "{{ playbook_dir }}/secrets/{{ inventory_hostname }}/wireguard"

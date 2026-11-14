@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+name: wireguard
+
+services:
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:{{ wireguard_version }}
+    container_name: wireguard
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "{{ common_timezone | default('Asia/Seoul') }}"
+      SERVERURL: "{{ vpn_server_url }}"
+      SERVERPORT: "{{ vpn_port }}"
+      PEERS: "{{ vpn_peers | join(',') }}"
+      PEERDNS: "{{ vpn_peer_dns }}"
+      INTERNAL_SUBNET: "{{ vpn_subnet }}"
+      ALLOWEDIPS: "{{ vpn_allowed_ips }}"
+      LOG_CONFS: "false"
+    ports:
+      - "{{ vpn_port }}:51820/udp"
+    volumes:
+      - ./config:/config
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

@@ -22,3 +22,5 @@ server1
 [monitoring]   ; 07  Prometheus + Grafana 를 둘 서버 (exporter 는 모든 서버)
 
 [middleware]   ; 09
+
+[vpn]          ; 12

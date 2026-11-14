@@ -1,0 +1,45 @@
+- name: Check peer names
+  ansible.builtin.assert:
+    that: vpn_peers | select('match', '^[A-Za-z0-9]+$') | list | length == vpn_peers | length
+    fail_msg: "vpn_peers 는 영문/숫자 이름만 가능합니다: {{ vpn_peers }}"
+    quiet: true
+
+- name: Create wireguard directory
+  ansible.builtin.file:
+    path: "{{ wireguard_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"          # 피어 개인 키가 들어감
+
+- name: Write docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ wireguard_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start WireGuard
+  community.docker.docker_compose_v2:
+    project_src: "{{ wireguard_dir }}"
+    state: present
+  register: wg_up
+
+- name: Wait for peer configs
+  ansible.builtin.stat:
+    path: "{{ wireguard_dir }}/config/peer_{{ item }}/peer_{{ item }}.conf"
+  loop: "{{ vpn_peers }}"
+  register: peer_confs
+  until: peer_confs.stat.exists
+  retries: 30
+  delay: 2
+
+- name: Fetch peer configs to controller
+  ansible.builtin.fetch:
+    src: "{{ wireguard_dir }}/config/peer_{{ item }}/peer_{{ item }}.conf"
+    dest: "{{ vpn_fetch_dir }}/{{ item }}.conf"
+    flat: true
+  loop: "{{ vpn_peers }}"
+
+- name: Where to find the configs
+  ansible.builtin.debug:
+    msg: "접속 설정: {{ vpn_fetch_dir }}/<이름>.conf  (gitignore 됨, 안전한 곳에 보관)"

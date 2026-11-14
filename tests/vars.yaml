@@ -57,3 +57,7 @@ k8s_disable_swap: false                   # VM 의 swap 을 끄지 않음 → ku
 k8s_load_kernel_modules: false            # 컨테이너엔 /lib/modules 가 없음 (overlay, br_netfilter 는 VM 커널에 내장)
 k8s_preflight_ignore_errors: [SystemVerification]   # 커널 설정 파일(/proc/config.gz) 없음
 k8s_kube_proxy_conntrack_max_per_core: 0  # 중첩 컨테이너에선 nf_conntrack_max 를 못 바꿈 (kind 와 같은 설정)
+
+# 12 vpn
+vpn_server_url: vpn.test
+vpn_peers: [laptop, phone]

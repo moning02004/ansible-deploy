@@ -49,6 +49,9 @@ postgres_databases: []
 # ---------- 07 monitoring ----------
 grafana_domain: grafana.example.com
 grafana_admin_password: "<8자 이상>"
+# alert_slack_webhook_url: "https://hooks.slack.com/services/..."
+# alert_telegram_bot_token: "..."     # + alert_telegram_chat_id: 123456789
+# alert_webhook_url: "https://..."
 
 # ---------- 08 security ----------
 # security_disable_password_auth: true    # 인벤토리를 키 접속으로 바꾼 뒤에
@@ -67,3 +70,7 @@ middleware_allowed_sources: []             # 예) [10.0.0.0/24]
 # backup_restic_repository: "s3:https://kr.object.ncloudstorage.com/my-bucket/orca"
 # backup_restic_password: "<random. 잃으면 복구 불가>"
 # backup_restic_env: { AWS_ACCESS_KEY_ID: "...", AWS_SECRET_ACCESS_KEY: "..." }
+
+# ---------- 12 vpn ----------
+# vpn_server_url: vpn.example.com        # 기본 auto (공인 IP 자동 감지)
+# vpn_peers: [laptop, phone]

@@ -10,5 +10,6 @@ common_packages:
   - htop
   - jq
   - unzip
+  - make              # wharfline 등 서버의 Makefile 명령(make up, make backup)용
   - tzdata
   - iproute2          # ansible_default_ipv4 수집에 필요 (최소 이미지에는 없음)

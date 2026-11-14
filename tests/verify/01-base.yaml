@@ -58,6 +58,11 @@
       changed_when: false
       failed_when: "'Hello from Docker!' not in hello.stdout"
 
+    - name: Base tools are installed
+      ansible.builtin.command: "{{ item }} --version"
+      loop: [make, git, jq, curl]
+      changed_when: false
+
     - name: docker compose plugin works
       ansible.builtin.command: docker compose version
       changed_when: false

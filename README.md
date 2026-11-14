@@ -9,7 +9,7 @@
 | 03 | `03-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ✅ |
 | 04 | `04-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
 | 05 | `05-postgres.yaml` | base + PostgreSQL | ✅ |
-| 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ⬜ |
+| 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ✅ |
 | 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ⬜ |
 | 08 | `08-middleware.yaml` | RabbitMQ + Redis | ⬜ |
 | 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ⬜ |
@@ -139,3 +139,13 @@ networks:
 Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 05/08 은 `DOCKER-USER` 체인에 출발지 제한 규칙을 넣고, `docker-firewall.service` 가 Docker 재시작/재부팅 때마다 다시 적용합니다.
 - 규칙 파일: `/etc/docker-firewall/rules.d/*.rules` (`<포트> <프로토콜> <허용 CIDR...>`)
 - 확인: `sudo iptables -S DOCKER-USER`
+
+## 06-monitoring
+| 대상 | 구성 |
+|---|---|
+| `[monitoring]` | Prometheus (127.0.0.1:9090), Grafana (127.0.0.1:3001 → nginx `grafana_domain`) |
+| 모든 서버 (`monitoring_targets`, 기본 all) | node-exporter :9100, cAdvisor :9280 — 모니터링 서버 IP 에서만 접근 허용 |
+
+- Grafana 에 Prometheus 데이터소스와 **Node Exporter Full** 대시보드가 자동으로 들어갑니다 (`grafana_dashboards` 로 추가).
+- 서버를 추가하면 06 을 다시 실행하세요. Prometheus 수집 대상이 인벤토리에서 다시 만들어집니다.
+- 모든 컨테이너는 host 네트워크라 ufw 규칙을 그대로 따릅니다.

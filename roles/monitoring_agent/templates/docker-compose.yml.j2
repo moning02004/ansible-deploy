@@ -1,0 +1,42 @@
+# {{ ansible_managed }}
+# host 네트워크: 포트가 ufw 규칙을 그대로 따름 (Docker 포트 우회 없음)
+name: monitoring-agent
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+services:
+  node-exporter:
+    image: prom/node-exporter:{{ node_exporter_version }}
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=:{{ node_exporter_port }}
+    volumes:
+      - /:/host:ro,rslave
+    logging: *logging
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:{{ cadvisor_version }}
+    container_name: cadvisor
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    command:
+      - --port={{ cadvisor_port }}
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    logging: *logging

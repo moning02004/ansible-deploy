@@ -1,0 +1,66 @@
+# 06-monitoring 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 06 monitoring"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: All Prometheus targets are up
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/targets
+        return_content: true
+      register: targets
+      until: >-
+        (targets.json.data.activeTargets | length) >= 3 and
+        (targets.json.data.activeTargets | rejectattr('health', 'equalto', 'up') | list | length) == 0
+      retries: 20
+      delay: 5
+
+    - name: node and cadvisor metrics are collected
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9090/api/v1/query?query={{ item | urlencode }}"
+        return_content: true
+      register: q
+      failed_when: q.json.data.result | length == 0
+      loop:
+        - node_load1
+        - container_last_seen
+
+    - name: Grafana is healthy through nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/api/health
+        headers: { Host: "{{ grafana_domain }}" }
+        return_content: true
+      register: gh
+      failed_when: gh.json.database != 'ok'
+
+    - name: Grafana has Prometheus datasource and dashboard
+      ansible.builtin.uri:
+        url: "http://127.0.0.1/api/{{ item.path }}"
+        headers: { Host: "{{ grafana_domain }}" }
+        user: admin
+        password: "{{ grafana_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: gapi
+      failed_when: item.expect not in gapi.content
+      loop:
+        - { path: "datasources/uid/prometheus/health", expect: '"status":"OK"' }
+        - { path: "search?query=Node", expect: "Node Exporter Full" }
+
+    - name: Prometheus and Grafana listen on localhost only
+      ansible.builtin.shell: ss -ltnH | awk '{print $4}'
+      register: listen
+      changed_when: false
+      failed_when: listen.stdout is search('(0\.0\.0\.0|\*|\[::\]):(9090|3001)\b')
+
+    - name: Exporter ports are blocked for non-monitoring clients
+      ansible.builtin.command: docker run --rm busybox:1.37 nc -z -w 3 {{ ansible_default_ipv4.address }} {{ item }}
+      delegate_to: localhost
+      become: false
+      register: ext
+      changed_when: false
+      failed_when: ext.rc == 0
+      loop: [9100, 9280]

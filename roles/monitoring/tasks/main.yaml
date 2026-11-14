@@ -1,0 +1,114 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that:
+      - grafana_domain | length > 0
+      - grafana_admin_password | length >= 8
+    fail_msg: "grafana_domain / grafana_admin_password(8자 이상) 를 vault 에 설정하세요"
+    quiet: true
+
+- name: Create directories
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0755"
+  loop: ["", grafana/provisioning/datasources, grafana/provisioning/dashboards, grafana/dashboards]
+
+- name: Write .env (secrets)
+  ansible.builtin.copy:
+    dest: "{{ monitoring_dir }}/.env"
+    content: "GRAFANA_ADMIN_PASSWORD={{ grafana_admin_password }}\n"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Write prometheus.yml
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_dir }}/prometheus.yml"
+    mode: "0644"
+  register: prom_cfg
+
+- name: Write docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Provision Prometheus datasource
+  ansible.builtin.copy:
+    dest: "{{ monitoring_dir }}/grafana/provisioning/datasources/prometheus.yml"
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          uid: prometheus
+          type: prometheus
+          access: proxy
+          url: http://127.0.0.1:{{ prometheus_port }}
+          isDefault: true
+    mode: "0644"
+  register: ds_cfg
+
+- name: Provision dashboard folder
+  ansible.builtin.copy:
+    dest: "{{ monitoring_dir }}/grafana/provisioning/dashboards/default.yml"
+    content: |
+      apiVersion: 1
+      providers:
+        - name: default
+          folder: Infrastructure
+          type: file
+          options:
+            path: /var/lib/grafana/dashboards
+    mode: "0644"
+  register: dash_cfg
+
+- name: Download dashboards from grafana.com
+  ansible.builtin.get_url:
+    url: "https://grafana.com/api/dashboards/{{ item.id }}/revisions/latest/download"
+    dest: "{{ monitoring_dir }}/grafana/dashboards/{{ item.name }}.json"
+    mode: "0644"
+  loop: "{{ grafana_dashboards }}"
+
+- name: Point dashboards at the provisioned datasource
+  ansible.builtin.replace:
+    path: "{{ monitoring_dir }}/grafana/dashboards/{{ item.name }}.json"
+    regexp: '\$\{DS_PROMETHEUS\}'
+    replace: prometheus
+  loop: "{{ grafana_dashboards }}"
+
+- name: Start Prometheus and Grafana
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_dir }}"
+    state: present
+    wait: true
+    wait_timeout: 180
+
+- name: Reload Prometheus config
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ prometheus_port }}/-/reload"
+    method: POST
+  when: prom_cfg is changed
+  register: prom_reload
+  until: prom_reload.status == 200
+  retries: 10
+  delay: 3
+  changed_when: true
+
+- name: Restart Grafana to pick up provisioning
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_dir }}"
+    services: [grafana]
+    state: restarted
+  when: ds_cfg is changed or dash_cfg is changed
+
+- name: Wait for Grafana
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ grafana_port }}/api/health"
+  register: gf
+  until: gf.status == 200
+  retries: 30
+  delay: 3

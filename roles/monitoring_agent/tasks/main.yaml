@@ -1,0 +1,27 @@
+- name: Create agent directory
+  ansible.builtin.file:
+    path: "{{ monitoring_agent_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Write docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_agent_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Allow scraping from monitoring servers only
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.1 | string }}"
+    proto: tcp
+    from_ip: "{{ item.0 }}"
+    comment: monitoring
+  loop: "{{ monitoring_server_ips | product([node_exporter_port, cadvisor_port]) | list }}"
+
+- name: Start exporters
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_agent_dir }}"
+    state: present
+    wait: true
+    wait_timeout: 120

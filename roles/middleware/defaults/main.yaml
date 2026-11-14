@@ -1,0 +1,18 @@
+middleware_dir: /opt/middleware
+middleware_bind: 0.0.0.0
+# 외부 접속을 허용할 CIDR. 비우면 외부 접속 전부 차단 (DOCKER-USER)
+middleware_allowed_sources: []
+
+middleware_rabbitmq_enabled: true
+rabbitmq_version: "4.4.0-management"   # https://hub.docker.com/_/rabbitmq
+rabbitmq_port: 5672
+rabbitmq_management_port: 15672        # 127.0.0.1 에만
+rabbitmq_user: ""                      # 필수 (vault). 최초 기동 때만 적용
+rabbitmq_password: ""
+
+middleware_redis_enabled: true
+redis_version: "8.10.3-alpine"         # https://hub.docker.com/_/redis
+redis_port: 6379
+redis_password: ""                     # 필수 (vault)
+redis_maxmemory: 256mb
+redis_maxmemory_policy: allkeys-lru

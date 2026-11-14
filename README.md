@@ -11,7 +11,7 @@
 | 05 | `05-postgres.yaml` | base + PostgreSQL | ✅ |
 | 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ✅ |
 | 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ✅ |
-| 08 | `08-middleware.yaml` | RabbitMQ + Redis | ⬜ |
+| 08 | `08-middleware.yaml` | RabbitMQ + Redis | ✅ |
 | 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ⬜ |
 | 10 | `10-restore.yaml` | 백업 파일로 복구 | ⬜ |
 
@@ -161,3 +161,10 @@ Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 05/08 은 `DOCK
 | 업데이트 | unattended-upgrades 로 보안 업데이트 자동 설치 (`security_auto_reboot` 로 자동 재부팅) |
 
 **잠김 방지**: 비밀번호 로그인을 막으려면 `deploy_user_ssh_keys` 가 있어야 하고, root 로그인을 막으려면 Ansible 이 root 가 아닌 계정으로 접속해야 합니다. 조건이 안 맞으면 실행 전에 중단합니다. 비밀번호 로그인을 막기 전에 **인벤토리를 SSH 키 접속(`ansible_user=manager`, `ansible_ssh_private_key_file=...`)으로 바꾸세요.**
+
+## 08-middleware
+- RabbitMQ 4.4 (관리 화면 포함) + Redis 8 (`/opt/middleware`)
+- 5672 / 6379 는 `middleware_allowed_sources` 의 CIDR 에서만 접속 가능
+- RabbitMQ 관리 화면은 127.0.0.1:15672 에만 → `ssh -L 15672:localhost:15672 manager@서버` 후 http://localhost:15672
+- Redis: 비밀번호 필수, AOF 켜짐, `redis_maxmemory`(256mb) + allkeys-lru, `vm.overcommit_memory=1`
+- `middleware_rabbitmq_enabled` / `middleware_redis_enabled` 로 하나만 쓸 수 있음

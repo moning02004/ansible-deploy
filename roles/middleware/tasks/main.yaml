@@ -1,0 +1,59 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that:
+      - not middleware_rabbitmq_enabled or (rabbitmq_user | length > 0 and rabbitmq_password | length >= 8)
+      - not middleware_redis_enabled or redis_password | length >= 8
+    fail_msg: "rabbitmq_user / rabbitmq_password(8자 이상) / redis_password(8자 이상) 를 vault 에 설정하세요"
+    quiet: true
+
+- name: Redis recommends overcommit_memory=1
+  ansible.posix.sysctl:
+    name: vm.overcommit_memory
+    value: "1"
+    sysctl_file: /etc/sysctl.d/60-redis.conf
+  when: middleware_redis_enabled | bool
+
+- name: Create middleware directory
+  ansible.builtin.file:
+    path: "{{ middleware_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0750"
+
+- name: Write .env (secrets)
+  ansible.builtin.copy:
+    dest: "{{ middleware_dir }}/.env"
+    content: |
+      RABBITMQ_USER={{ rabbitmq_user }}
+      RABBITMQ_PASSWORD={{ rabbitmq_password }}
+      REDIS_PASSWORD={{ redis_password }}
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Write docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ middleware_dir }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+
+- name: Restrict external access
+  ansible.builtin.include_role:
+    name: docker_firewall
+  vars:
+    docker_firewall_name: middleware
+    docker_firewall_rules: >-
+      {{ ([{'port': rabbitmq_port, 'from': middleware_allowed_sources}] if middleware_rabbitmq_enabled else [])
+       + ([{'port': redis_port, 'from': middleware_allowed_sources}] if middleware_redis_enabled else []) }}
+
+- name: Start middleware
+  community.docker.docker_compose_v2:
+    project_src: "{{ middleware_dir }}"
+    state: present
+    remove_orphans: true
+    wait: true
+    wait_timeout: 300

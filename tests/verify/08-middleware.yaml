@@ -1,0 +1,66 @@
+# 08-middleware 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 08 middleware"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: RabbitMQ management API accepts the configured user
+      ansible.builtin.uri:
+        url: http://127.0.0.1:15672/api/whoami
+        user: "{{ rabbitmq_user }}"
+        password: "{{ rabbitmq_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: who
+      failed_when: who.json.name != rabbitmq_user
+
+    - name: RabbitMQ can publish and consume through the API
+      ansible.builtin.shell: |
+        set -e
+        A="-s -u {{ rabbitmq_user }}:{{ rabbitmq_password }} -H content-type:application/json"
+        curl $A -X PUT http://127.0.0.1:15672/api/queues/%2F/verify -d '{"durable":true}' >/dev/null  # 4.x 는 비-durable 일반 큐 금지
+        curl $A -X POST http://127.0.0.1:15672/api/exchanges/%2F/amq.default/publish \
+          -d '{"properties":{},"routing_key":"verify","payload":"hello-mq","payload_encoding":"string"}'
+        curl $A -X POST http://127.0.0.1:15672/api/queues/%2F/verify/get \
+          -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}'
+        curl $A -X DELETE http://127.0.0.1:15672/api/queues/%2F/verify
+      register: mq
+      changed_when: false
+      failed_when: "'hello-mq' not in mq.stdout"
+
+    - name: Redis requires the password
+      ansible.builtin.shell: |
+        docker exec -e REDISCLI_AUTH= redis redis-cli ping 2>&1 || true
+        docker exec redis redis-cli set verify ok
+        docker exec redis redis-cli get verify
+        docker exec redis redis-cli config get maxmemory-policy
+      register: rd
+      changed_when: false
+      failed_when: >-
+        'NOAUTH' not in rd.stdout or
+        rd.stdout_lines[-3] != 'ok' or
+        'allkeys-lru' not in rd.stdout
+
+    - name: overcommit_memory is 1
+      ansible.builtin.command: sysctl -n vm.overcommit_memory
+      register: oc
+      changed_when: false
+      failed_when: oc.stdout != '1'
+
+    - name: Management UI is localhost only
+      ansible.builtin.shell: ss -ltnH | awk '{print $4}'
+      register: listen
+      changed_when: false
+      failed_when: listen.stdout is search('(0\.0\.0\.0|\*|\[::\]):15672\b')
+
+    - name: External clients are blocked
+      ansible.builtin.command: docker run --rm busybox:1.37 nc -z -w 3 {{ ansible_default_ipv4.address }} {{ item }}
+      delegate_to: localhost
+      become: false
+      register: ext
+      changed_when: false
+      failed_when: ext.rc == 0
+      loop: [5672, 6379]

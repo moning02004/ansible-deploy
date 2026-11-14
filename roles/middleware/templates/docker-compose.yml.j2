@@ -1,0 +1,64 @@
+# {{ ansible_managed }}
+name: middleware
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+{% if middleware_rabbitmq_enabled %}
+  rabbitmq:
+    image: rabbitmq:{{ rabbitmq_version }}
+    container_name: rabbitmq
+    hostname: rabbitmq          # 노드 이름(rabbit@rabbitmq) 고정 → 데이터 볼륨 유지
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?}
+    ports:
+      - "{{ middleware_bind }}:{{ rabbitmq_port }}:5672"
+      - "127.0.0.1:{{ rabbitmq_management_port }}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging: *logging
+{% endif %}
+{% if middleware_redis_enabled %}
+
+  redis:
+    image: redis:{{ redis_version }}
+    container_name: redis
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes
+        --maxmemory {{ redis_maxmemory }} --maxmemory-policy {{ redis_maxmemory_policy }}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
+    ports:
+      - "{{ middleware_bind }}:{{ redis_port }}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+{% endif %}
+
+volumes:
+{% if middleware_rabbitmq_enabled %}
+  rabbitmq_data:
+{% endif %}
+{% if middleware_redis_enabled %}
+  redis_data:
+{% endif %}

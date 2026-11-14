@@ -1,0 +1,67 @@
+# {{ ansible_managed }}
+name: gitlab
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:{{ gitlab_version }}
+    container_name: gitlab
+    hostname: "{{ gitlab_domain }}"
+    restart: unless-stopped
+    shm_size: 256m
+    environment:
+      GITLAB_ROOT_PASSWORD: ${GITLAB_ROOT_PASSWORD:?}
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '{{ gitlab_external_url }}'
+        # TLS 는 호스트 nginx 가 처리 → 컨테이너 안 nginx 는 HTTP 80 만
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = { "X-Forwarded-Proto" => "{{ site_scheme | default('http') }}", "X-Forwarded-Ssl" => "{{ 'on' if (site_scheme | default('http')) == 'https' else 'off' }}" }
+        letsencrypt['enable'] = false
+        gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port }}
+        gitlab_rails['initial_root_password'] = ENV['GITLAB_ROOT_PASSWORD']
+        gitlab_rails['gitlab_signup_enabled'] = {{ gitlab_signup_enabled | string | lower }}
+{% if gitlab_low_memory %}
+        puma['worker_processes'] = 0
+        sidekiq['concurrency'] = 10
+        prometheus_monitoring['enable'] = false
+        gitlab_rails['env'] = { 'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000' }
+        gitaly['env'] = { 'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000', 'GITALY_COMMAND_SPAWN_MAX_PARALLEL' => '2' }
+{% endif %}
+    ports:
+      - "127.0.0.1:{{ gitlab_http_port }}:80"
+      - "{{ gitlab_ssh_port }}:22"
+    volumes:
+      - config:/etc/gitlab
+      - logs:/var/log/gitlab
+      - data:/var/opt/gitlab
+    # 첫 기동(마이그레이션)이 길어서 유예 시간을 넉넉히
+    healthcheck:
+      test: ["CMD", "/opt/gitlab/bin/gitlab-healthcheck", "--fail", "--max-time", "10"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 600s
+    logging: *logging
+{% if gitlab_runner_enabled %}
+
+  runner:
+    image: gitlab/gitlab-runner:{{ gitlab_runner_version }}
+    container_name: gitlab-runner
+    restart: unless-stopped
+    volumes:
+      - runner_config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging: *logging
+{% endif %}
+
+volumes:
+  config:
+  logs:
+  data:
+{% if gitlab_runner_enabled %}
+  runner_config:
+{% endif %}

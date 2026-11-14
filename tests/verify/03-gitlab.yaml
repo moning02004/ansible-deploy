@@ -1,0 +1,76 @@
+# 03-gitlab 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 03 gitlab"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: nginx config is valid
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: GitLab sign-in page through nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/users/sign_in
+        headers: { Host: "{{ gitlab_domain }}" }
+        return_content: true
+      register: signin
+      failed_when: "'GitLab' not in signin.content"
+
+    - name: GitLab health check
+      ansible.builtin.command: docker exec gitlab curl -fsS http://localhost/-/health
+      register: health
+      changed_when: false
+      failed_when: "'GitLab OK' not in health.stdout"
+
+
+    - name: Root password works and runner is online (rails)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - gitlab
+          - gitlab-rails
+          - runner
+          - >-
+            u = User.find_by_username('root');
+            puts "root_ok=#{u.valid_password?('{{ gitlab_root_password }}')}";
+            puts "external=#{Gitlab.config.gitlab.url}";
+            puts "runners=#{Ci::Runner.count}"
+      register: rails
+      changed_when: false
+      failed_when: >-
+        'root_ok=true' not in rails.stdout or
+        ('external=http://' ~ gitlab_domain) not in rails.stdout or
+        'runners=0' in rails.stdout
+
+    - name: gitlab-runner can reach GitLab with its token
+      ansible.builtin.command: docker exec gitlab-runner gitlab-runner verify
+      register: rverify
+      changed_when: false
+      # rails runner 직후엔 메모리 압박으로 puma 가 잠깐 502 를 낼 수 있음 → 재시도
+      until: "'is valid' in (rverify.stdout ~ rverify.stderr)"
+      retries: 18
+      delay: 10
+      failed_when: "'is valid' not in (rverify.stdout ~ rverify.stderr)"
+
+    - name: GitLab SSH port is listening
+      ansible.builtin.wait_for:
+        port: "{{ gitlab_ssh_port | default(2222) }}"
+        timeout: 10
+
+    - name: wharfline responds through nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/
+        headers: { Host: "{{ wharfline_domain }}" }
+        return_content: true
+      register: wf
+      failed_when: "'<html' not in wf.content | lower"
+
+    - name: Internal services are not exposed on all interfaces
+      ansible.builtin.shell: ss -ltnH | awk '{print $4}'
+      register: listen
+      changed_when: false
+      failed_when: listen.stdout is search('(0\.0\.0\.0|\*|\[::\]):(8929|8080|5432)\b')

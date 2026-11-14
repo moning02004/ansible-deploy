@@ -1,0 +1,142 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that:
+      - gitlab_domain | length > 0
+      - gitlab_root_password | length >= 8
+    fail_msg: "gitlab_domain / gitlab_root_password(8자 이상) 를 vault 에 설정하세요"
+    quiet: true
+
+- name: Warn on low memory
+  ansible.builtin.debug:
+    msg: "⚠️ 메모리 {{ ansible_memtotal_mb }}MB — GitLab 은 4GB 이상을 권장합니다"
+  when: ansible_memtotal_mb < 3800
+
+- name: Create gitlab directory
+  ansible.builtin.file:
+    path: "{{ gitlab_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0750"
+
+- name: Write .env (secrets)
+  ansible.builtin.copy:
+    dest: "{{ gitlab_dir }}/.env"
+    content: "GITLAB_ROOT_PASSWORD={{ gitlab_root_password }}\n"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Write docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ gitlab_dir }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+
+- name: Allow GitLab SSH port
+  community.general.ufw:
+    rule: allow
+    port: "{{ gitlab_ssh_port | string }}"
+    proto: tcp
+    comment: gitlab-ssh
+
+- name: Start GitLab (first boot takes several minutes)
+  community.docker.docker_compose_v2:
+    project_src: "{{ gitlab_dir }}"
+    state: present
+    remove_orphans: true
+
+- name: Wait for GitLab to answer
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ gitlab_http_port }}/users/sign_in"
+  register: gitlab_web
+  until: gitlab_web.status == 200
+  retries: 90
+  delay: 10
+
+# GitLab 은 비밀번호 정책(흔한 단어 조합 금지 등)에 걸리면 root 를 만들지 않고 로그만 남긴 채 기동함
+- name: Check root account exists
+  ansible.builtin.command: docker exec gitlab gitlab-psql -tAc "SELECT count(*) FROM users WHERE username = 'root'"
+  register: gitlab_root_count
+  changed_when: false
+
+- name: Create root account (re-run admin seed)
+  ansible.builtin.command:
+    argv: [docker, exec, -e, "GITLAB_ROOT_PASSWORD={{ gitlab_root_password }}", gitlab,
+           gitlab-rake, db:seed_fu, FILTER=admin]
+  register: gitlab_seed
+  when: gitlab_root_count.stdout | trim == '0'
+  failed_when: >-
+    gitlab_seed.rc != 0 or 'Could not create' in gitlab_seed.stdout
+  ignore_errors: true     # 아래 태스크에서 이유를 보여 주고 중단
+  no_log: true
+
+- name: Show root creation error
+  ansible.builtin.fail:
+    msg: >-
+      root 계정을 만들지 못했습니다: {{ gitlab_seed.stdout_lines | select('search', '-->') | list }}.
+      gitlab_root_password 를 더 강한 값(흔한 단어 조합이 아닌 무작위 문자열)으로 바꿔 다시 실행하세요.
+  when: gitlab_seed is failed
+
+- name: Register gitlab-runner
+  when: gitlab_runner_enabled | bool
+  block:
+    - name: Check runner registration
+      ansible.builtin.command: docker exec gitlab-runner cat /etc/gitlab-runner/config.toml
+      register: runner_cfg
+      changed_when: false
+      failed_when: false
+
+    - name: Create runner and register it
+      when: "'[[runners]]' not in runner_cfg.stdout"
+      no_log: true
+      block:
+        # 1) root 의 단기 PAT 생성 (create_runner 권한만, 1일 만료)
+        - name: Create short-lived root token
+          ansible.builtin.command:
+            argv:
+              - docker
+              - exec
+              - gitlab
+              - gitlab-rails
+              - runner
+              - >-
+                t = User.find_by_username('root').personal_access_tokens.create!(
+                  scopes: ['create_runner'], name: 'ansible-runner-registration', expires_at: 1.day.from_now);
+                puts t.token
+          register: gitlab_pat
+
+        # 2) API 로 인스턴스 러너 생성 → glrt- 토큰 (GitLab 16+ 방식)
+        - name: Create instance runner via API
+          ansible.builtin.uri:
+            url: "http://127.0.0.1:{{ gitlab_http_port }}/api/v4/user/runners"
+            method: POST
+            headers:
+              PRIVATE-TOKEN: "{{ gitlab_pat.stdout_lines | last }}"
+            body_format: form-urlencoded
+            body:
+              runner_type: instance_type
+              description: "{{ gitlab_runner_name }}"
+              run_untagged: "true"
+            status_code: 201
+          register: gitlab_runner_api
+
+        # 3) runner 컨테이너에 등록 (compose 네트워크 안에서 http://gitlab 으로 접속)
+        - name: Register runner
+          ansible.builtin.command:
+            argv:
+              - docker
+              - exec
+              - gitlab-runner
+              - gitlab-runner
+              - register
+              - --non-interactive
+              - --url=http://gitlab
+              - "--token={{ gitlab_runner_api.json.token }}"
+              - --executor=docker
+              - "--docker-image={{ gitlab_runner_docker_image }}"
+              - "--name={{ gitlab_runner_name }}"
+              - --docker-network-mode=gitlab_default

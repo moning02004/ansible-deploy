@@ -1,0 +1,15 @@
+gitlab_version: "19.5.5-ce.0"        # https://hub.docker.com/r/gitlab/gitlab-ce/tags
+gitlab_runner_version: "v19.5.3"     # https://hub.docker.com/r/gitlab/gitlab-runner/tags
+gitlab_dir: /opt/gitlab
+
+gitlab_domain: ""                    # 필수. 예) gitlab.example.com
+gitlab_external_url: "{{ site_scheme | default('http') }}://{{ gitlab_domain }}"
+gitlab_http_port: 8929               # 127.0.0.1 에만 바인딩 (nginx 가 프록시)
+gitlab_ssh_port: 2222
+gitlab_root_password: ""             # 필수 (vault). 8자 이상 + 흔한 단어 조합 금지(GitLab 정책) → openssl rand -base64 18 권장
+gitlab_low_memory: true              # 4GB 서버용 절약 설정 (puma 단일 프로세스, 내장 모니터링 끔)
+gitlab_signup_enabled: false
+
+gitlab_runner_enabled: true
+gitlab_runner_name: "{{ inventory_hostname }}-runner"
+gitlab_runner_docker_image: "alpine:latest"   # .gitlab-ci.yml 에 image 가 없을 때 기본값

@@ -6,18 +6,18 @@
 |---|---|---|---|
 | 01 | `01-base.yaml` | 공통 설정, deploy 유저, ufw, Docker, docker rollout | ✅ |
 | 02 | `02-gitea.yaml` | base + Gitea + act_runner + wharfline + nginx | ✅ |
-| 03 | `03-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ⬜ |
-| 04 | `04-app.yaml` | base + nginx + 배포 디렉터리 (CI가 배포하는 대상 서버) | ⬜ |
+| 03 | `03-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ✅ |
+| 04 | `04-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ⬜ |
 | 05 | `05-postgres.yaml` | base + PostgreSQL | ⬜ |
 | 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ⬜ |
-| 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화 (단독 실행용) | ⬜ |
+| 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ⬜ |
 | 08 | `08-middleware.yaml` | RabbitMQ + Redis | ⬜ |
 | 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ⬜ |
 | 10 | `10-restore.yaml` | 백업 파일로 복구 | ⬜ |
 
 ## 환경
 - ansible-core 2.18 이상
-- 대상 서버: Ubuntu / Debian
+- 대상 서버: **Ubuntu 22.04 / 24.04** (다른 배포판은 01-base 에서 중단)
 - 컬렉션: `ansible-galaxy collection install -r requirements.yaml`
 
 ## 디렉터리
@@ -91,3 +91,12 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 - **act_runner**: 첫 실행 때 토큰을 발급해 자동 등록합니다. 다시 등록하려면 `/opt/gitea/runner.env` 와 `gitea_runner_data` 볼륨을 지우고 재실행하세요.
 - **wharfline 마스터 키**: `wharfline_master_key` 를 비워 두면 첫 실행 때 서버에서 만들고 `secrets/<호스트>/wharfline_master_keys` 로 가져옵니다(gitignore). **vault 로 옮기고 로컬 파일은 지우세요.** 잃으면 저장된 비밀 값을 복구할 수 없습니다.
 - **wharfline 이미지는 amd64 전용**입니다. ARM 서버에서는 `wharfline_platform: linux/amd64` 로 에뮬레이션 실행할 수 있습니다(느림).
+
+## 03-gitlab
+02-gitea 의 GitLab 버전입니다. 구성은 같고 Gitea 대신 GitLab CE + gitlab-runner 가 `/opt/gitlab` 에 뜹니다.
+
+- 버전: `gitlab_version` 19.5.5-ce.0, `gitlab_runner_version` v19.5.3
+- **메모리 4GB 이상**. `gitlab_low_memory: true`(기본)는 puma 단일 프로세스, 내장 모니터링 끄기로 메모리를 아낍니다. 8GB 이상이면 false 로.
+- **`gitlab_root_password` 는 무작위 문자열로** (`openssl rand -base64 18`). GitLab 은 흔한 단어 조합 비밀번호면 root 를 만들지 않고 조용히 기동합니다. role 이 이를 감지해 다시 만들고, 그래도 안 되면 이유를 보여 주고 중단합니다.
+- runner: 첫 실행 때 root 의 단기 토큰(1일, create_runner 권한)으로 인스턴스 러너를 만들어 등록합니다.
+- 첫 기동은 5~10분 걸립니다.

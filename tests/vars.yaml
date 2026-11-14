@@ -15,3 +15,39 @@ wharfline_owner_password: test-owner-pw-1234
 # 테스트 머신이 arm64(Mac)여도 amd64 전용 wharfline 이미지를 돌리기 위함 (amd64 에서는 영향 없음)
 wharfline_platform: linux/amd64
 wharfline_install_qemu: false   # Docker Desktop 이 binfmt 를 이미 등록해 둠
+
+# 03 gitlab
+gitlab_domain: gitlab.test
+gitlab_root_password: "Qx7#vLp2!mZr9Tk4"   # GitLab 비밀번호 정책 통과용
+
+# 04 app
+app_example_enabled: true
+app_example_domain: whoami.test
+
+# 05 postgres
+postgres_superuser_password: test-pg-super
+postgres_allowed_sources: [10.99.0.0/16]      # 테스트 클라이언트(172.x)는 포함되지 않음 → 차단돼야 함
+postgres_databases:
+  - { name: appdb, user: appuser, password: "it's-test" }
+
+# 06 monitoring
+grafana_domain: grafana.test
+grafana_admin_password: test-grafana-pw
+
+# 07 security
+security_disable_password_auth: true      # deploy_user_ssh_keys 가 있으므로 허용됨
+security_fail2ban_ignoreip: [192.0.2.10]
+
+# 08 middleware
+rabbitmq_user: mqadmin
+rabbitmq_password: test-mq-pw
+redis_password: test-redis-pw
+middleware_allowed_sources: [10.99.0.0/16]
+
+# 09 backup
+backup_restic_repository: /var/backups/restic-test
+backup_restic_password: test-restic-pw
+
+# 10 restore (테스트에서만 확인 생략)
+restore_confirm: "yes"
+restore_components: [postgres, gitea, wharfline, rabbitmq, redis]

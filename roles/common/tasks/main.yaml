@@ -1,7 +1,9 @@
 - name: Check supported OS
   ansible.builtin.assert:
-    that: ansible_os_family == "Debian"
-    fail_msg: "Ubuntu/Debian 계열만 지원합니다 (현재: {{ ansible_distribution }})"
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version is version('22.04', '>=')
+    fail_msg: "Ubuntu 22.04 이상만 지원합니다 (현재: {{ ansible_distribution }} {{ ansible_distribution_version }})"
     quiet: true
 
 - name: Update apt cache

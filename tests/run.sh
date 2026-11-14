@@ -3,6 +3,9 @@
 #   tests/run.sh 01-base            실행 → 멱등성(2회차 changed=0) → verify
 #   tests/run.sh 01-base --keep     끝난 뒤 컨테이너 유지 (docker exec -it orca-ansible-test bash)
 #   UBUNTU_VERSION=22.04 tests/run.sh 01-base
+#
+# tests/prepare/<이름>.yaml 이 있으면 플레이북 전에 먼저 실행 (사전 서비스/데이터 준비)
+# verify 파일에 "# test: skip-idempotency" 가 있으면 2회차 실행을 건너뜀 (예: 복구)
 set -euo pipefail
 
 PB="${1:?사용법: tests/run.sh <플레이북 이름, 예: 01-base> [--keep]}"
@@ -21,7 +24,7 @@ log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 WORK="$(mktemp -d)"
 cleanup() {
   rm -rf "$WORK"
-  if [[ "$KEEP" != "--keep" ]]; then docker rm -f "$NAME" >/dev/null 2>&1 || true; fi
+  if [[ "$KEEP" != "--keep" ]]; then docker rm -f -v "$NAME" >/dev/null 2>&1 || true; fi
 }
 trap cleanup EXIT
 
@@ -29,7 +32,7 @@ log "이미지 빌드 ($IMAGE)"
 docker build -q --build-arg UBUNTU_VERSION="$UBUNTU_VERSION" -t "$IMAGE" "$ROOT/tests" >/dev/null
 
 log "테스트 컨테이너 시작"
-docker rm -f "$NAME" >/dev/null 2>&1 || true
+docker rm -f -v "$NAME" >/dev/null 2>&1 || true
 # /var/lib/docker, containerd 를 볼륨으로 빼야 컨테이너 안 Docker 가 overlayfs 를 쓸 수 있음
 docker run -d --name "$NAME" --hostname "$NAME" \
   --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
@@ -47,13 +50,24 @@ cd "$WORK"
 export ANSIBLE_CONFIG="$WORK/ansible.cfg" ANSIBLE_FORCE_COLOR=1
 ARGS=(-i tests/inventory.ini -e @tests/vars.yaml)
 
+if [[ -f "tests/prepare/$PB.yaml" ]]; then
+  log "준비: tests/prepare/$PB.yaml"
+  ansible-playbook "${ARGS[@]}" "tests/prepare/$PB.yaml"
+fi
+
 log "1회차 실행: $PB.yaml"
 ansible-playbook "${ARGS[@]}" "$PB.yaml"
 
-log "2회차 실행: 멱등성 확인"
-ansible-playbook "${ARGS[@]}" "$PB.yaml" | tee "$WORK/second.log"
-if ! grep -Eq 'changed=0 .*failed=0' "$WORK/second.log"; then
-  echo "✗ 멱등성 실패: 2회차 실행에서 changed 가 0 이 아닙니다"; exit 1
+if grep -q '# test: skip-idempotency' "tests/verify/$PB.yaml"; then
+  log "2회차 실행: 건너뜀 (skip-idempotency)"
+else
+  log "2회차 실행: 멱등성 확인"
+  ansible-playbook "${ARGS[@]}" "$PB.yaml" | tee "$WORK/second.log"
+  if ! grep -Eq 'changed=0 .*failed=0' "$WORK/second.log"; then
+    echo "✗ 멱등성 실패: 2회차 실행에서 changed 가 0 이 아닙니다"
+    grep -B1 '^changed:' "$WORK/second.log" | sed 's/\x1b\[[0-9;]*m//g' | grep TASK || true
+    exit 1
+  fi
 fi
 
 log "verify: tests/verify/$PB.yaml"

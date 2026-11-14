@@ -7,7 +7,7 @@
     - name: postgres marker
       ansible.builtin.command: >-
         docker exec postgres psql -U postgres -d appdb -c
-        "CREATE TABLE IF NOT EXISTS marker(v text); TRUNCATE marker; INSERT INTO marker VALUES ('marker-v1')"
+        "CREATE TABLE IF NOT EXISTS marker(v text); TRUNCATE marker; INSERT INTO marker VALUES ('marker-v1'); ALTER TABLE marker OWNER TO appuser"
     - name: redis marker
       ansible.builtin.command: docker exec redis redis-cli set marker v1
     - name: rabbitmq durable queue

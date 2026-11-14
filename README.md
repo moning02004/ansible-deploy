@@ -13,7 +13,7 @@
 | 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ✅ |
 | 08 | `08-middleware.yaml` | RabbitMQ + Redis | ✅ |
 | 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ✅ |
-| 10 | `10-restore.yaml` | 백업 파일로 복구 | ⬜ |
+| 10 | `10-restore.yaml` | 백업 파일로 복구 | ✅ |
 
 ## 환경
 - ansible-core 2.18 이상
@@ -190,3 +190,23 @@ ansible-playbook ... 09-backup.yaml --tags now -e backup_fetch=true   # + backup
 - 위치: `/var/backups/orca/<시각>/` (`latest` 링크), `backup_keep_days`(7일) 지나면 삭제
 - 서버에서 직접: `sudo orca-backup`, 로그: `journalctl -u orca-backup`
 - **외부 저장소**: `backup_restic_repository` 를 지정하면 restic 으로 S3 / SFTP / NAS 에도 보냅니다 (일 7, 주 4, 월 6 보관). `backup_restic_password` 를 잃으면 풀 수 없습니다.
+
+## 10-restore
+09 로 만든 백업으로 복구합니다. **현재 데이터를 덮어쓰므로** 확인 값과 대상을 꼭 지정해야 실행됩니다.
+
+```bash
+# 서버에 있는 최신 백업으로 postgres 복구
+ansible-playbook ... 10-restore.yaml --limit db1 -e restore_confirm=yes -e '{"restore_components": ["postgres"]}'
+
+# 특정 시점
+... -e restore_from=20261114-030000
+
+# 서버가 망가져 새로 만든 경우: 01 + 해당 프리셋 실행 → 가져온 백업을 올려서 복구
+... -e restore_upload_dir=backups/db1/20261114-030000
+
+# restic 저장소에서
+... -e restore_restic_snapshot=latest
+```
+- 구성 요소: `postgres`, `gitea`, `wharfline`, `gitlab`, `rabbitmq`, `redis`
+- 서비스는 미리 설치돼 있어야 합니다 (새 서버면 01 + 프리셋 먼저)
+- wharfline 은 `wharfline_master_key` 가 백업 당시와 같아야 하고, gitlab 은 `gitlab_version` 이 같아야 합니다

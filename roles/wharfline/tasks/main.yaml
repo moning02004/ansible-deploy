@@ -117,6 +117,10 @@
     wait: true
     wait_timeout: 600
   register: wharfline_up
+  # 느린 서버(에뮬레이션 등)에선 backend 가 healthcheck 허용 시간을 넘길 수 있음 → 재시도
+  until: wharfline_up is succeeded
+  retries: 3
+  delay: 15
   # 일회용 migrate 컨테이너는 up 할 때마다 다시 실행됨 (마이그레이션은 advisory lock 으로 안전) → 변경으로 세지 않음
   changed_when: >-
     wharfline_up.actions | default([])

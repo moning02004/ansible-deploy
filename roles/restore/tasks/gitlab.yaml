@@ -1,0 +1,28 @@
+# GitLab 버전이 백업 당시와 같아야 합니다 (gitlab_version 고정)
+- name: "gitlab | stop puma and sidekiq"
+  ansible.builtin.shell: docker exec gitlab gitlab-ctl stop puma && docker exec gitlab gitlab-ctl stop sidekiq
+
+- name: "gitlab | copy backup into container"
+  ansible.builtin.shell: |
+    docker cp "{{ src }}/gitlab_backup.tar" gitlab:/var/opt/gitlab/backups/orca-restore_gitlab_backup.tar
+    docker exec gitlab chown git:git /var/opt/gitlab/backups/orca-restore_gitlab_backup.tar
+
+- name: "gitlab | restore secrets and config"
+  ansible.builtin.shell: docker exec -i gitlab tar xzf - -C /etc/gitlab < "{{ src }}/gitlab-config.tar.gz"
+
+- name: "gitlab | gitlab-backup restore"
+  ansible.builtin.command: docker exec gitlab gitlab-backup restore BACKUP=orca-restore force=yes
+
+- name: "gitlab | cleanup and restart"
+  ansible.builtin.shell: |
+    docker exec gitlab rm -f /var/opt/gitlab/backups/orca-restore_gitlab_backup.tar
+    docker exec gitlab gitlab-ctl reconfigure >/dev/null
+    docker restart gitlab
+
+- name: "gitlab | wait"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ gitlab_http_port | default(8929) }}/users/sign_in"
+  register: gl
+  until: gl.status == 200
+  retries: 60
+  delay: 10

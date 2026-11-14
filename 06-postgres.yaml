@@ -1,16 +1,16 @@
-# 05. postgres — base + PostgreSQL (Docker)
+# 06. postgres — base + PostgreSQL (Docker)
 #   인벤토리의 [postgres] 그룹에 적용됩니다.
 #   5432 는 postgres_allowed_sources 의 CIDR 에서만 접속 가능 (비우면 서버 내부에서만)
 #
 # 실행:
-#   ansible-playbook -i inventory/all.ini.vault 05-postgres.yaml --vault-password-file vault_password.txt
+#   ansible-playbook -i inventory/all.ini.vault 06-postgres.yaml --vault-password-file vault_password.txt
 #
 # 필수 변수 (vault): postgres_superuser_password
 - import_playbook: 01-base.yaml
   vars:
     base_hosts: postgres
 
-- name: "05 postgres | PostgreSQL"
+- name: "06 postgres | PostgreSQL"
   hosts: postgres
   become: true
 

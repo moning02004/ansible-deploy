@@ -16,13 +16,13 @@ running() { [ "$(docker inspect -f '{{ '{{' }}.State.Running{{ '}}' }}' "$1" 2>/
 vol_exists() { docker volume inspect "$1" >/dev/null 2>&1; }
 vol_tar() { docker run --rm -v "$1":/v:ro busybox:1.37 tar czf - -C /v . > "$2"; }
 
-# 05 postgres
+# 06 postgres
 if running postgres; then
   log "postgres: pg_dumpall"
   docker exec postgres pg_dumpall -U postgres --clean --if-exists | gzip > "$OUT/postgres-all.sql.gz"
 fi
 
-# 02 gitea (DB + 저장소/설정 볼륨)
+# 03 gitea (DB + 저장소/설정 볼륨)
 if running gitea-db; then
   log "gitea: pg_dump + data volume"
   docker exec gitea-db pg_dump -U gitea -Fc gitea > "$OUT/gitea-db.dump"
@@ -35,7 +35,7 @@ if [ -f /opt/wharfline/docker-compose.yml ] && running wharfline-db-1; then
   docker exec wharfline-db-1 pg_dump -U wharfline -Fc wharfline > "$OUT/wharfline-db.dump"
 fi
 
-# 03 gitlab (gitlab-backup + secrets)
+# 04 gitlab (gitlab-backup + secrets)
 if running gitlab; then
   log "gitlab: gitlab-backup create"
   docker exec gitlab gitlab-backup create BACKUP="orca-$TS" STRATEGY=copy CRON=1 >/dev/null
@@ -44,13 +44,13 @@ if running gitlab; then
   docker exec gitlab tar czf - -C /etc/gitlab gitlab-secrets.json gitlab.rb > "$OUT/gitlab-config.tar.gz"
 fi
 
-# 08 rabbitmq (유저/큐/익스체인지 정의)
+# 09 rabbitmq (유저/큐/익스체인지 정의)
 if running rabbitmq; then
   log "rabbitmq: export_definitions"
   docker exec rabbitmq rabbitmqctl -q export_definitions - > "$OUT/rabbitmq-definitions.json"
 fi
 
-# 08 redis (RDB 스냅샷)
+# 09 redis (RDB 스냅샷)
 if running redis; then
   log "redis: SAVE"
   docker exec redis redis-cli save >/dev/null

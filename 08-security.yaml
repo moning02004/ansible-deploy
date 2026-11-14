@@ -1,16 +1,16 @@
-# 07. security — 방화벽 규칙 재적용 + fail2ban + SSH 강화 + 보안 업데이트 자동 설치
+# 08. security — 방화벽 규칙 재적용 + fail2ban + SSH 강화 + 보안 업데이트 자동 설치
 #   모든 서버에 적용 (단독 실행용). 허용 IP 를 바꿨을 때도 이것만 다시 돌리면 됩니다.
 #
 # 실행:
-#   ansible-playbook -i inventory/all.ini.vault 07-security.yaml --vault-password-file vault_password.txt
+#   ansible-playbook -i inventory/all.ini.vault 08-security.yaml --vault-password-file vault_password.txt
 #   방화벽만: --tags firewall     SSH/fail2ban 만: --tags security
 #
 # ⚠️ security_disable_password_auth: true 로 하기 전에 인벤토리를 SSH 키 접속으로 바꾸세요
-- name: "07 security | firewall + fail2ban + ssh hardening"
+- name: "08 security | firewall + fail2ban + ssh hardening"
   hosts: "{{ security_hosts | default('all') }}"
   become: true
 
   roles:
     - { role: firewall,        tags: [firewall] }
-    - { role: docker_firewall, tags: [firewall] }   # 05/08 이 남긴 rules.d 를 다시 적용
+    - { role: docker_firewall, tags: [firewall] }   # 06/09 가 남긴 rules.d 를 다시 적용
     - { role: security,        tags: [security] }

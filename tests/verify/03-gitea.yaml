@@ -1,7 +1,7 @@
-# 02-gitea 결과 점검 (01-base 점검 포함)
+# 03-gitea 결과 점검 (01-base 점검 포함)
 - import_playbook: 01-base.yaml
 
-- name: "verify | 02 gitea"
+- name: "verify | 03 gitea"
   hosts: all
   become: true
   gather_facts: false

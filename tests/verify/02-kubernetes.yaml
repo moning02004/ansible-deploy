@@ -1,7 +1,7 @@
-# 11-kubernetes 결과 점검 (01-base 점검 포함)
+# 02-kubernetes 결과 점검 (01-base 점검 포함)
 - import_playbook: 01-base.yaml
 
-- name: "verify | 11 kubernetes"
+- name: "verify | 02 kubernetes"
   hosts: all
   become: true
   gather_facts: true

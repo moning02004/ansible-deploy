@@ -1,7 +1,7 @@
-# 04-app 결과 점검 (01-base 점검 포함)
+# 05-app 결과 점검 (01-base 점검 포함)
 - import_playbook: 01-base.yaml
 
-- name: "verify | 04 app"
+- name: "verify | 05 app"
   hosts: all
   become: true
   gather_facts: false

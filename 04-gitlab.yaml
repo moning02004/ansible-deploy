@@ -1,8 +1,8 @@
-# 03. gitlab — base + nginx + GitLab CE + gitlab-runner + wharfline   (02-gitea 의 GitLab 버전)
+# 04. gitlab — base + nginx + GitLab CE + gitlab-runner + wharfline   (03-gitea 의 GitLab 버전)
 #   인벤토리의 [gitlab] 그룹에 적용됩니다. 메모리 4GB 이상 권장 (8GB 이상이면 gitlab_low_memory: false)
 #
 # 실행:
-#   ansible-playbook -i inventory/all.ini.vault 03-gitlab.yaml --vault-password-file vault_password.txt
+#   ansible-playbook -i inventory/all.ini.vault 04-gitlab.yaml --vault-password-file vault_password.txt
 #   일부만: --tags nginx | gitlab | wharfline
 #
 # 필수 변수 (vault): gitlab_domain, gitlab_root_password,
@@ -11,7 +11,7 @@
   vars:
     base_hosts: gitlab
 
-- name: "03 gitlab | GitLab CE + gitlab-runner + wharfline + nginx"
+- name: "04 gitlab | GitLab CE + gitlab-runner + wharfline + nginx"
   hosts: gitlab
   become: true
 

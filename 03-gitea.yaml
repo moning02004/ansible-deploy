@@ -1,8 +1,8 @@
-# 02. gitea — base + nginx + Gitea + act_runner + wharfline
+# 03. gitea — base + nginx + Gitea + act_runner + wharfline
 #   인벤토리의 [gitea] 그룹에 적용됩니다.
 #
 # 실행:
-#   ansible-playbook -i inventory/all.ini.vault 02-gitea.yaml --vault-password-file vault_password.txt
+#   ansible-playbook -i inventory/all.ini.vault 03-gitea.yaml --vault-password-file vault_password.txt
 #   일부만: --tags nginx | gitea | wharfline   (base 건너뛰기: --skip-tags common,user,firewall,docker)
 #
 # 필수 변수 (vault): gitea_domain, gitea_db_password, gitea_admin_email, gitea_admin_password,
@@ -12,7 +12,7 @@
   vars:
     base_hosts: gitea
 
-- name: "02 gitea | Gitea + act_runner + wharfline + nginx"
+- name: "03 gitea | Gitea + act_runner + wharfline + nginx"
   hosts: gitea
   become: true
 

@@ -1,7 +1,7 @@
-# 06-monitoring 결과 점검 (01-base 점검 포함)
+# 07-monitoring 결과 점검 (01-base 점검 포함)
 - import_playbook: 01-base.yaml
 
-- name: "verify | 06 monitoring"
+- name: "verify | 07 monitoring"
   hosts: all
   become: true
   gather_facts: true

@@ -1,24 +1,24 @@
 # 서버 정의 (접속 정보)
-#   07-security 로 비밀번호 로그인을 막기 전에 키 접속으로 바꾸세요:
+#   08-security 로 비밀번호 로그인을 막기 전에 키 접속으로 바꾸세요:
 #   server1 ansible_host=... ansible_user=manager ansible_ssh_private_key_file=~/.ssh/id_ed25519
 server1 ansible_host=192.168.0.104 ansible_port=22 ansible_user=ubuntu ansible_ssh_pass=password ansible_become_password=password
 
 # 프리셋 그룹: 서버를 용도에 맞는 그룹에 넣으면 해당 NN-*.yaml 이 그 서버에 적용됩니다
-# 01-base, 07-security, 09-backup 은 모든 서버(all) 대상입니다
+# 01-base, 08-security, 10-backup 은 모든 서버(all) 대상입니다
 [servers]
 server1
 
-[gitea]        ; 02
+[kubernetes]   ; 02  (80/443 을 쓰므로 03/04/05 와 같은 서버에 두지 않기)
+
+[gitea]        ; 03
 server1
 
-[gitlab]       ; 03  (02 와 같은 서버에 두지 않기: nginx 사이트/포트 겹침)
+[gitlab]       ; 04  (03 과 같은 서버에 두지 않기: nginx 사이트/포트 겹침)
 
-[app]          ; 04  (02/03 과 같은 서버에 두지 않기: 80/443 겹침)
+[app]          ; 05  (03/04 와 같은 서버에 두지 않기: 80/443 겹침)
 
-[postgres]     ; 05
+[postgres]     ; 06
 
-[monitoring]   ; 06  Prometheus + Grafana 를 둘 서버 (exporter 는 모든 서버)
+[monitoring]   ; 07  Prometheus + Grafana 를 둘 서버 (exporter 는 모든 서버)
 
-[middleware]   ; 08
-
-[kubernetes]   ; 11  (80/443 을 쓰므로 02/03/04 와 같은 서버에 두지 않기)
+[middleware]   ; 09

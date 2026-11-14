@@ -1,5 +1,5 @@
-# 09-backup 결과 점검
-- name: "verify | 09 backup"
+# 10-backup 결과 점검
+- name: "verify | 10 backup"
   hosts: all
   become: true
   gather_facts: false
@@ -55,7 +55,7 @@
 
     - name: "--tags now works"
       ansible.builtin.command: >-
-        ansible-playbook -i tests/inventory.ini -e @tests/vars.yaml 09-backup.yaml --tags now
+        ansible-playbook -i tests/inventory.ini -e @tests/vars.yaml 10-backup.yaml --tags now
       delegate_to: localhost
       args:
         chdir: "{{ playbook_dir }}/../.."   # 저장소 루트

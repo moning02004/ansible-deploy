@@ -1,17 +1,17 @@
-# 08. middleware — base + RabbitMQ + Redis (Docker)
+# 09. middleware — base + RabbitMQ + Redis (Docker)
 #   인벤토리의 [middleware] 그룹에 적용됩니다.
 #   5672 / 6379 는 middleware_allowed_sources 의 CIDR 에서만 접속 가능 (비우면 서버 내부에서만)
 #   RabbitMQ 관리 화면(15672)은 127.0.0.1 에만 → ssh -L 15672:localhost:15672 서버 로 접속
 #
 # 실행:
-#   ansible-playbook -i inventory/all.ini.vault 08-middleware.yaml --vault-password-file vault_password.txt
+#   ansible-playbook -i inventory/all.ini.vault 09-middleware.yaml --vault-password-file vault_password.txt
 #
 # 필수 변수 (vault): rabbitmq_user, rabbitmq_password, redis_password
 - import_playbook: 01-base.yaml
   vars:
     base_hosts: middleware
 
-- name: "08 middleware | RabbitMQ + Redis"
+- name: "09 middleware | RabbitMQ + Redis"
   hosts: middleware
   become: true
 

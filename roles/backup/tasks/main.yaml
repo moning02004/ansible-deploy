@@ -98,7 +98,7 @@
 - name: Fail if schedule was never installed
   ansible.builtin.assert:
     that: backup_script.stat.exists
-    fail_msg: "백업 스크립트가 없습니다. 먼저 태그 없이 09-backup.yaml 을 실행하세요"
+    fail_msg: "백업 스크립트가 없습니다. 먼저 태그 없이 10-backup.yaml 을 실행하세요"
     quiet: true
   tags: [now, never]
 

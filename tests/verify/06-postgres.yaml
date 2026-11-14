@@ -1,7 +1,7 @@
-# 05-postgres 결과 점검 (01-base 점검 포함)
+# 06-postgres 결과 점검 (01-base 점검 포함)
 - import_playbook: 01-base.yaml
 
-- name: "verify | 05 postgres"
+- name: "verify | 06 postgres"
   hosts: all
   become: true
   gather_facts: true

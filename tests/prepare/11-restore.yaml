@@ -1,8 +1,8 @@
-# 서비스 설치 → 표시 데이터(v1) → 백업 → 데이터 망가뜨리기(v2) 까지 준비. 이후 10-restore 로 v1 이 돌아와야 함
-- import_playbook: ../../02-gitea.yaml
-- import_playbook: ../../05-postgres.yaml
-- import_playbook: ../../08-middleware.yaml
-- import_playbook: ../../09-backup.yaml
+# 서비스 설치 → 표시 데이터(v1) → 백업 → 데이터 망가뜨리기(v2) 까지 준비. 이후 11-restore 로 v1 이 돌아와야 함
+- import_playbook: ../../03-gitea.yaml
+- import_playbook: ../../06-postgres.yaml
+- import_playbook: ../../09-middleware.yaml
+- import_playbook: ../../10-backup.yaml
 - import_playbook: seed.yaml
 
 - name: "prepare | gitea + wharfline marker, backup, then break data"

@@ -1,9 +1,9 @@
-# 06. monitoring — Prometheus + Grafana, 그리고 모든 서버에 node-exporter / cAdvisor
+# 07. monitoring — Prometheus + Grafana, 그리고 모든 서버에 node-exporter / cAdvisor
 #   [monitoring] 그룹: Prometheus + Grafana (+ nginx)
 #   monitoring_targets 그룹 (기본 all): node-exporter(9100), cAdvisor(9280) — 모니터링 서버 IP 에서만 접근 허용
 #
 # 실행:
-#   ansible-playbook -i inventory/all.ini.vault 06-monitoring.yaml --vault-password-file vault_password.txt
+#   ansible-playbook -i inventory/all.ini.vault 07-monitoring.yaml --vault-password-file vault_password.txt
 #   에이전트만 다시: --tags agent      서버만: --tags monitoring
 #
 # 필수 변수 (vault): grafana_domain, grafana_admin_password
@@ -11,13 +11,13 @@
   vars:
     base_hosts: "{{ monitoring_targets | default('all') }}:monitoring"
 
-- name: "06 monitoring | exporters on every target"
+- name: "07 monitoring | exporters on every target"
   hosts: "{{ monitoring_targets | default('all') }}"
   become: true
   roles:
     - { role: monitoring_agent, tags: [agent] }
 
-- name: "06 monitoring | Prometheus + Grafana"
+- name: "07 monitoring | Prometheus + Grafana"
   hosts: monitoring
   become: true
   vars:

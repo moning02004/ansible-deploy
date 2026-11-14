@@ -1,5 +1,5 @@
-# 07-security 결과 점검
-- name: "verify | 07 security"
+# 08-security 결과 점검
+- name: "verify | 08 security"
   hosts: all
   become: true
   gather_facts: false
@@ -55,7 +55,7 @@
     - name: Lockout guard refuses to disable password login without SSH keys
       ansible.builtin.command:
         argv: [ansible-playbook, -i, tests/inventory.ini, -e, "@tests/vars.yaml",
-               -e, '{"deploy_user_ssh_keys": []}', 07-security.yaml, --tags, security]
+               -e, '{"deploy_user_ssh_keys": []}', 08-security.yaml, --tags, security]
       delegate_to: localhost
       args:
         chdir: "{{ playbook_dir }}/../.."   # 저장소 루트

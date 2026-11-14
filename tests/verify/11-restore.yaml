@@ -1,6 +1,6 @@
 # test: skip-idempotency  (복구는 실행할 때마다 데이터를 덮어씀)
-# 10-restore 결과 점검: 백업 시점(v1) 데이터가 돌아왔는지
-- name: "verify | 10 restore"
+# 11-restore 결과 점검: 백업 시점(v1) 데이터가 돌아왔는지
+- name: "verify | 11 restore"
   hosts: all
   become: true
   gather_facts: false
@@ -53,7 +53,7 @@
 
     - name: Refuses to run without confirmation
       ansible.builtin.command: >-
-        ansible-playbook -i tests/inventory.ini -e @tests/vars.yaml -e restore_confirm=no 10-restore.yaml
+        ansible-playbook -i tests/inventory.ini -e @tests/vars.yaml -e restore_confirm=no 11-restore.yaml
       delegate_to: localhost
       args:
         chdir: "{{ playbook_dir }}/../.."   # 저장소 루트

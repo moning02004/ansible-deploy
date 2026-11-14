@@ -1,7 +1,7 @@
-# 08-middleware 결과 점검 (01-base 점검 포함)
+# 09-middleware 결과 점검 (01-base 점검 포함)
 - import_playbook: 01-base.yaml
 
-- name: "verify | 08 middleware"
+- name: "verify | 09 middleware"
   hosts: all
   become: true
   gather_facts: true

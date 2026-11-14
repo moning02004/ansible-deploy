@@ -1,7 +1,7 @@
-# 03-gitlab 결과 점검 (01-base 점검 포함)
+# 04-gitlab 결과 점검 (01-base 점검 포함)
 - import_playbook: 01-base.yaml
 
-- name: "verify | 03 gitlab"
+- name: "verify | 04 gitlab"
   hosts: all
   become: true
   gather_facts: false

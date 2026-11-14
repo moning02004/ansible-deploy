@@ -1,8 +1,8 @@
-# 10. restore — 09-backup 으로 만든 백업에서 복구
+# 11. restore — 10-backup 으로 만든 백업에서 복구
 #   ⚠️ 현재 데이터를 백업 시점으로 덮어씁니다. 반드시 --limit 로 서버를 지정하세요.
 #
 # 실행 (서버에 있는 최신 백업으로 postgres 복구):
-#   ansible-playbook ... 10-restore.yaml --limit db1 -e restore_confirm=yes -e '{"restore_components": ["postgres"]}'
+#   ansible-playbook ... 11-restore.yaml --limit db1 -e restore_confirm=yes -e '{"restore_components": ["postgres"]}'
 #
 # 복구 원본 (택1)
 #   restore_from: latest | 20261114-030000      서버의 /var/backups/orca/<이름>  (기본 latest)
@@ -11,7 +11,7 @@
 #
 # 구성 요소: postgres, gitea, wharfline, gitlab, rabbitmq, redis
 #   서비스는 미리 설치돼 있어야 합니다 (새 서버라면 01 + 해당 프리셋을 먼저 실행)
-- name: "10 restore"
+- name: "11 restore"
   hosts: "{{ restore_hosts | default('all') }}"
   become: true
   serial: 1

@@ -3,7 +3,7 @@ deploy_user: manager
 deploy_user_ssh_keys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl test@orca"
 
-# 02 gitea
+# 03 gitea
 gitea_domain: git.test
 gitea_db_password: test-gitea-db
 gitea_admin_email: admin@git.test
@@ -16,43 +16,43 @@ wharfline_owner_password: test-owner-pw-1234
 wharfline_platform: linux/amd64
 wharfline_install_qemu: false   # Docker Desktop 이 binfmt 를 이미 등록해 둠
 
-# 03 gitlab
+# 04 gitlab
 gitlab_domain: gitlab.test
 gitlab_root_password: "Qx7#vLp2!mZr9Tk4"   # GitLab 비밀번호 정책 통과용
 
-# 04 app
+# 05 app
 app_example_enabled: true
 app_example_domain: whoami.test
 
-# 05 postgres
+# 06 postgres
 postgres_superuser_password: test-pg-super
 postgres_allowed_sources: [10.99.0.0/16]      # 테스트 클라이언트(172.x)는 포함되지 않음 → 차단돼야 함
 postgres_databases:
   - { name: appdb, user: appuser, password: "it's-test" }
 
-# 06 monitoring
+# 07 monitoring
 grafana_domain: grafana.test
 grafana_admin_password: test-grafana-pw
 
-# 07 security
+# 08 security
 security_disable_password_auth: true      # deploy_user_ssh_keys 가 있으므로 허용됨
 security_fail2ban_ignoreip: [192.0.2.10]
 
-# 08 middleware
+# 09 middleware
 rabbitmq_user: mqadmin
 rabbitmq_password: test-mq-pw
 redis_password: test-redis-pw
 middleware_allowed_sources: [10.99.0.0/16]
 
-# 09 backup
+# 10 backup
 backup_restic_repository: /var/backups/restic-test
 backup_restic_password: test-restic-pw
 
-# 10 restore (테스트에서만 확인 생략)
+# 11 restore (테스트에서만 확인 생략)
 restore_confirm: "yes"
 restore_components: [postgres, gitea, wharfline, rabbitmq, redis]
 
-# 11 kubernetes (테스트 컨테이너는 Docker Desktop VM 커널을 공유)
+# 02 kubernetes (테스트 컨테이너는 Docker Desktop VM 커널을 공유)
 k8s_disable_swap: false                   # VM 의 swap 을 끄지 않음 → kubelet failSwapOn=false
 k8s_load_kernel_modules: false            # 컨테이너엔 /lib/modules 가 없음 (overlay, br_netfilter 는 VM 커널에 내장)
 k8s_preflight_ignore_errors: [SystemVerification]   # 커널 설정 파일(/proc/config.gz) 없음

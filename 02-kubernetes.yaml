@@ -1,4 +1,4 @@
-# 11. kubernetes — base(Docker) + Kubernetes 단일 노드 클러스터 (kubeadm)
+# 02. kubernetes — base(Docker) + Kubernetes 단일 노드 클러스터 (kubeadm)
 #   인벤토리의 [kubernetes] 그룹에 적용됩니다.
 #   Docker 와 Kubernetes 가 같은 containerd 를 나눠 씁니다 (Docker: moby / k8s: k8s.io 네임스페이스).
 #   docker compose 로 띄우던 서비스는 그대로 두고, 같은 서버에서 kubectl / helm 도 쓸 수 있습니다.
@@ -7,17 +7,17 @@
 #         → Helm → metrics-server → local-path(기본 StorageClass) → Traefik(ingress, 80/443) → etcd 일일 스냅샷
 #
 # 실행:
-#   ansible-playbook -i inventory/all.ini.vault 11-kubernetes.yaml --vault-password-file vault_password.txt
+#   ansible-playbook -i inventory/all.ini.vault 02-kubernetes.yaml --vault-password-file vault_password.txt
 #   일부만: --tags k8s-addons | k8s-helm | k8s-backup ...   (base 건너뛰기: --skip-tags common,user,firewall,docker)
 #
 # 필수 변수: 없음 (기본값으로 동작). 원격 kubectl: k8s_api_allowed_sources + k8s_api_cert_sans
-# ⚠️ Traefik 이 hostPort 80/443 을 쓰므로 02-gitea(nginx), 04-app(traefik) 과 같은 서버에 두지 마세요.
+# ⚠️ Traefik 이 hostPort 80/443 을 쓰므로 03-gitea(nginx), 05-app(traefik) 과 같은 서버에 두지 마세요.
 #    (겹치면 k8s_ingress_enabled: false 또는 k8s_ingress_http_port/https_port 변경)
 - import_playbook: 01-base.yaml
   vars:
     base_hosts: kubernetes
 
-- name: "11 kubernetes | Docker + Kubernetes (kubeadm)"
+- name: "02 kubernetes | Docker + Kubernetes (kubeadm)"
   hosts: kubernetes
   become: true
 

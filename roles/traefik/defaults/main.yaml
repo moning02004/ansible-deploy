@@ -1,0 +1,5 @@
+traefik_version: "v3.7.19"          # https://hub.docker.com/_/traefik
+traefik_dir: /opt/traefik
+traefik_network: web                # 앱 컨테이너가 붙을 외부 네트워크
+traefik_acme_email: ""              # 지정하면 Let's Encrypt 자동 HTTPS (라우터마다 tls 자동 적용)
+traefik_log_level: INFO

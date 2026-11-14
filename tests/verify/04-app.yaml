@@ -1,0 +1,69 @@
+# 04-app 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 04 app"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Traefik is healthy
+      ansible.builtin.command: docker inspect -f '{{ "{{" }}.State.Health.Status{{ "}}" }}' traefik
+      register: th
+      changed_when: false
+      failed_when: th.stdout != 'healthy'
+
+    - name: Example app is routed by host header
+      ansible.builtin.uri:
+        url: http://127.0.0.1/
+        headers: { Host: "{{ app_example_domain }}" }
+        return_content: true
+      register: ex
+      until: ex.status == 200 and 'host=' in ex.content
+      retries: 10
+      delay: 2
+
+    - name: Unknown host returns 404
+      ansible.builtin.uri:
+        url: http://127.0.0.1/
+        headers: { Host: nope.test }
+        status_code: 404
+
+    - name: Zero-downtime rollout (requests during rollout must all succeed)
+      ansible.builtin.shell: |
+        set -e
+        cd /srv/apps/example
+        before=$(curl -s -H 'Host: {{ app_example_domain }}' http://127.0.0.1/)
+        : > /tmp/rollout-codes
+        ( end=$((SECONDS+40)); while [ $SECONDS -lt $end ]; do
+            curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: {{ app_example_domain }}' http://127.0.0.1/ >> /tmp/rollout-codes
+            sleep 0.1
+          done ) &
+        loader=$!
+        sleep 2
+        docker rollout web --pre-stop-hook "touch /tmp/drain && sleep 5"
+        sleep 3
+        kill $loader 2>/dev/null || true
+        after=$(curl -s -H 'Host: {{ app_example_domain }}' http://127.0.0.1/)
+        echo "before=$before after=$after"
+        [ "$before" != "$after" ] && echo "replaced=yes" || echo "replaced=no"
+        echo "total=$(wc -l < /tmp/rollout-codes) non200=$(grep -vc '^200$' /tmp/rollout-codes || true)"
+      args:
+        executable: /bin/bash
+      become_user: "{{ deploy_user }}"
+      register: rollout
+      changed_when: false
+      failed_when: >-
+        rollout.rc != 0 or
+        'non200=0' not in rollout.stdout or
+        'replaced=yes' not in rollout.stdout
+
+    - name: Show rollout result
+      ansible.builtin.debug:
+        msg: "{{ rollout.stdout_lines[-3:] }}"
+
+    - name: Deploy user owns app root
+      ansible.builtin.stat:
+        path: /srv/apps
+      register: approot
+      failed_when: approot.stat.pw_name != deploy_user

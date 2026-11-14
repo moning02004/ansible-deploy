@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# docker rollout 무중단 배포용 compose 예시. 실제 앱도 이 구조를 따르면 됩니다.
+#   배포: cd {{ app_root }}/example && docker compose pull web && docker rollout web --pre-stop-hook "touch /tmp/drain && sleep 5"
+#
+# 규칙
+#   - container_name 금지, ports(호스트 포트) 금지 → 같은 서비스 컨테이너가 잠시 2개 뜰 수 있어야 함
+#   - {{ traefik_network | default('web') }} 네트워크 + traefik 라벨로 라우팅
+#   - healthcheck 필수: 새 컨테이너가 healthy 가 된 뒤에 트래픽을 받음
+#   - /tmp/drain 이 생기면 unhealthy → Traefik 이 먼저 트래픽을 빼고 나서 옛 컨테이너가 종료됨
+services:
+  web:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    command: ["/bin/sh", "-c", "echo \"host=$$HOSTNAME\" > /usr/share/nginx/html/index.html && exec nginx -g 'daemon off;'"]
+    networks: [{{ traefik_network | default('web') }}]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.example.rule: "Host(`{{ app_example_domain }}`)"
+      traefik.http.services.example.loadbalancer.server.port: "80"
+    healthcheck:
+      test: ["CMD-SHELL", "test ! -f /tmp/drain && wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 1
+      start_period: 2s
+
+networks:
+  {{ traefik_network | default('web') }}:
+    external: true

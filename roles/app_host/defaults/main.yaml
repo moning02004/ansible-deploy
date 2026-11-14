@@ -1,0 +1,8 @@
+app_root: /srv/apps                 # 앱마다 /srv/apps/<앱>/docker-compose.yml
+# 이미지를 받을 private 레지스트리 로그인 (deploy 유저 계정에 저장)
+#   - { registry: ghcr.io, username: me, password: "{{ vault_ghcr_token }}" }
+app_registries: []
+
+# 예시 앱 (whoami 대용 nginx). docker rollout 무중단 배포 구조의 참고용
+app_example_enabled: false
+app_example_domain: whoami.example.com

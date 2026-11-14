@@ -7,7 +7,7 @@
 | 01 | `01-base.yaml` | 공통 설정, deploy 유저, ufw, Docker, docker rollout | ✅ |
 | 02 | `02-gitea.yaml` | base + Gitea + act_runner + wharfline + nginx | ✅ |
 | 03 | `03-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ✅ |
-| 04 | `04-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ⬜ |
+| 04 | `04-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
 | 05 | `05-postgres.yaml` | base + PostgreSQL | ⬜ |
 | 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ⬜ |
 | 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ⬜ |
@@ -100,3 +100,31 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 - **`gitlab_root_password` 는 무작위 문자열로** (`openssl rand -base64 18`). GitLab 은 흔한 단어 조합 비밀번호면 root 를 만들지 않고 조용히 기동합니다. role 이 이를 감지해 다시 만들고, 그래도 안 되면 이유를 보여 주고 중단합니다.
 - runner: 첫 실행 때 root 의 단기 토큰(1일, create_runner 권한)으로 인스턴스 러너를 만들어 등록합니다.
 - 첫 기동은 5~10분 걸립니다.
+
+## 04-app
+CI 나 wharfline 이 배포하는 **대상 서버**입니다. 앞단은 Traefik 이고, 앱은 `/srv/apps/<앱>/docker-compose.yml` 에 둡니다.
+
+왜 nginx 가 아니라 Traefik 인가: docker rollout 은 새 컨테이너를 옆에 띄운 뒤 옛 컨테이너를 내리는데, 호스트 nginx 가 `127.0.0.1:포트` 로 프록시하면 두 컨테이너가 같은 포트를 쓸 수 없습니다. Traefik 은 컨테이너 라벨을 보고 자동으로 트래픽을 나눠서 무중단 배포가 됩니다.
+
+앱 compose 규칙 (예시: `roles/app_host/templates/example-compose.yml.j2`)
+```yaml
+services:
+  web:
+    image: ghcr.io/me/app:1.2.3
+    networks: [web]                 # container_name, ports 쓰지 않기
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.myapp.rule: "Host(`app.example.com`)"
+      traefik.http.services.myapp.loadbalancer.server.port: "8000"
+    healthcheck:                    # 필수. /tmp/drain 이 있으면 unhealthy → 트래픽 빠짐
+      test: ["CMD-SHELL", "test ! -f /tmp/drain && wget -qO- http://127.0.0.1:8000/health"]
+      interval: 2s
+      retries: 1
+networks:
+  web: { external: true }
+```
+배포: `docker compose pull web && docker rollout web --pre-stop-hook "touch /tmp/drain && sleep 5"`
+
+- `traefik_acme_email` 을 지정하면 Let's Encrypt 자동 HTTPS
+- `app_registries` 로 private 레지스트리(ghcr.io 등) 로그인
+- 02/03 처럼 호스트 nginx 가 80/443 을 쓰는 서버와 같은 서버에 두지 마세요

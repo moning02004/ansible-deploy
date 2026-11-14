@@ -1,0 +1,45 @@
+- name: Create app root
+  ansible.builtin.file:
+    path: "{{ app_root }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0755"
+
+- name: Log in to registries (as deploy user)
+  community.docker.docker_login:
+    registry_url: "{{ item.registry }}"
+    username: "{{ item.username }}"
+    password: "{{ item.password }}"
+  become_user: "{{ deploy_user }}"
+  loop: "{{ app_registries }}"
+  loop_control:
+    label: "{{ item.registry }}"
+  no_log: true
+
+- name: Example app
+  when: app_example_enabled | bool
+  block:
+    - name: Create example app directory
+      ansible.builtin.file:
+        path: "{{ app_root }}/example"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0755"
+
+    - name: Write example compose
+      ansible.builtin.template:
+        src: example-compose.yml.j2
+        dest: "{{ app_root }}/example/docker-compose.yml"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0644"
+
+    - name: Start example app
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_root }}/example"
+        state: present
+        wait: true
+        wait_timeout: 120
+      become_user: "{{ deploy_user }}"

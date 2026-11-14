@@ -3,6 +3,7 @@
 #   tests/run.sh 01-base            실행 → 멱등성(2회차 changed=0) → verify
 #   tests/run.sh 01-base --keep     끝난 뒤 컨테이너 유지 (docker exec -it orca-ansible-test bash)
 #   UBUNTU_VERSION=22.04 tests/run.sh 01-base
+#   APT_MIRROR= tests/run.sh 01-base             (테스트 이미지의 apt 미러 변경, 빈 값이면 기본 미러)
 #
 # tests/prepare/<이름>.yaml 이 있으면 플레이북 전에 먼저 실행 (사전 서비스/데이터 준비)
 # verify 파일에 "# test: skip-idempotency" 가 있으면 2회차 실행을 건너뜀 (예: 복구)
@@ -29,7 +30,7 @@ cleanup() {
 trap cleanup EXIT
 
 log "이미지 빌드 ($IMAGE)"
-docker build -q --build-arg UBUNTU_VERSION="$UBUNTU_VERSION" -t "$IMAGE" "$ROOT/tests" >/dev/null
+docker build -q --build-arg UBUNTU_VERSION="$UBUNTU_VERSION" --build-arg APT_MIRROR="${APT_MIRROR-http://ftp.kaist.ac.kr}" -t "$IMAGE" "$ROOT/tests" >/dev/null
 
 log "테스트 컨테이너 시작"
 docker rm -f -v "$NAME" >/dev/null 2>&1 || true

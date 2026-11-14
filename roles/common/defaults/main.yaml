@@ -11,3 +11,4 @@ common_packages:
   - jq
   - unzip
   - tzdata
+  - iproute2          # ansible_default_ipv4 수집에 필요 (최소 이미지에는 없음)

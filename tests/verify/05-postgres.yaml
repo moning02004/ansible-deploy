@@ -1,0 +1,70 @@
+# 05-postgres 결과 점검 (01-base 점검 포함)
+- import_playbook: 01-base.yaml
+
+- name: "verify | 05 postgres"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: App user can log in over TCP with its password
+      ansible.builtin.command:
+        argv: [docker, exec, -e, "PGPASSWORD={{ postgres_databases[0].password }}", postgres,
+               psql, -h, 127.0.0.1, -U, "{{ postgres_databases[0].user }}", -d, "{{ postgres_databases[0].name }}",
+               -tAc, "SELECT current_user || '@' || current_database()"]
+      register: login
+      changed_when: false
+      failed_when: login.stdout != postgres_databases[0].user ~ '@' ~ postgres_databases[0].name
+
+    - name: Settings are applied
+      ansible.builtin.command: docker exec postgres psql -U postgres -tAc "SHOW max_connections"
+      register: maxconn
+      changed_when: false
+      failed_when: maxconn.stdout != '200'
+
+    - name: Server version is 18
+      ansible.builtin.command: docker exec postgres psql -U postgres -tAc "SHOW server_version_num"
+      register: ver
+      changed_when: false
+      failed_when: not ver.stdout.startswith('18')
+
+    - name: Port is reachable from the server itself
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 5432
+        timeout: 5
+
+    - name: External client NOT in allowed sources is blocked
+      ansible.builtin.command: docker run --rm busybox:1.37 nc -z -w 3 {{ ansible_default_ipv4.address }} 5432
+      delegate_to: localhost
+      become: false
+      register: blocked
+      changed_when: false
+      failed_when: blocked.rc == 0
+
+    - name: Temporarily allow the test client network
+      ansible.builtin.shell: |
+        echo "5432 tcp 172.16.0.0/12" > /etc/docker-firewall/rules.d/zz-verify.rules
+        /usr/local/sbin/docker-firewall
+      changed_when: false
+
+    - name: External client in allowed sources can connect
+      ansible.builtin.command: docker run --rm busybox:1.37 nc -z -w 3 {{ ansible_default_ipv4.address }} 5432
+      delegate_to: localhost
+      become: false
+      changed_when: false
+
+    - name: Remove temporary rule
+      ansible.builtin.shell: |
+        rm -f /etc/docker-firewall/rules.d/zz-verify.rules
+        /usr/local/sbin/docker-firewall
+      changed_when: false
+
+    - name: Firewall survives docker restart
+      ansible.builtin.shell: |
+        systemctl restart docker
+        sleep 5
+        iptables -S DOCKER-USER
+      register: chain
+      changed_when: false
+      failed_when: "'--ctorigdstport 5432' not in chain.stdout or '-j DROP' not in chain.stdout"

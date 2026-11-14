@@ -1,0 +1,82 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that: postgres_superuser_password | length >= 8
+    fail_msg: "postgres_superuser_password(8자 이상) 를 vault 에 설정하세요"
+    quiet: true
+
+- name: Create postgres directory
+  ansible.builtin.file:
+    path: "{{ postgres_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0750"
+
+- name: Write .env (secrets)
+  ansible.builtin.copy:
+    dest: "{{ postgres_dir }}/.env"
+    content: "POSTGRES_PASSWORD={{ postgres_superuser_password }}\n"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Write docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ postgres_dir }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+
+- name: Restrict external access to {{ postgres_port }}
+  ansible.builtin.include_role:
+    name: docker_firewall
+  vars:
+    docker_firewall_name: postgres
+    docker_firewall_rules:
+      - { port: "{{ postgres_port }}", proto: tcp, from: "{{ postgres_allowed_sources }}" }
+
+- name: Start PostgreSQL
+  community.docker.docker_compose_v2:
+    project_src: "{{ postgres_dir }}"
+    state: present
+    wait: true
+    wait_timeout: 180
+
+- name: Check existing roles
+  ansible.builtin.command: docker exec postgres psql -U postgres -tAc "SELECT rolname FROM pg_roles"
+  register: pg_roles
+  changed_when: false
+
+- name: Check existing databases
+  ansible.builtin.command: docker exec postgres psql -U postgres -tAc "SELECT datname FROM pg_database"
+  register: pg_dbs
+  changed_when: false
+
+- name: Create roles
+  ansible.builtin.command:
+    argv: [docker, exec, postgres, psql, -U, postgres, -v, ON_ERROR_STOP=1, -c,
+           "CREATE ROLE \"{{ item.user }}\" LOGIN PASSWORD '{{ item.password | replace(\"'\", \"''\") }}'"]
+  loop: "{{ postgres_databases }}"
+  loop_control: { label: "{{ item.user }}" }
+  when: item.user not in pg_roles.stdout_lines
+  no_log: true
+
+# 비밀번호를 vault 값과 항상 맞춤 (보고는 하지 않음)
+- name: Sync role passwords
+  ansible.builtin.command:
+    argv: [docker, exec, postgres, psql, -U, postgres, -v, ON_ERROR_STOP=1, -c,
+           "ALTER ROLE \"{{ item.user }}\" PASSWORD '{{ item.password | replace(\"'\", \"''\") }}'"]
+  loop: "{{ postgres_databases }}"
+  loop_control: { label: "{{ item.user }}" }
+  changed_when: false
+  no_log: true
+
+- name: Create databases
+  ansible.builtin.command:
+    argv: [docker, exec, postgres, psql, -U, postgres, -v, ON_ERROR_STOP=1, -c,
+           "CREATE DATABASE \"{{ item.name }}\" OWNER \"{{ item.user }}\""]
+  loop: "{{ postgres_databases }}"
+  loop_control: { label: "{{ item.name }}" }
+  when: item.name not in pg_dbs.stdout_lines

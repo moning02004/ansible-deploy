@@ -1,0 +1,15 @@
+postgres_version: "18.7"             # https://hub.docker.com/_/postgres
+postgres_dir: /opt/postgres
+postgres_superuser_password: ""      # 필수 (vault). 유저 이름은 postgres
+postgres_bind: 0.0.0.0
+postgres_port: 5432
+# 외부에서 접속을 허용할 CIDR. 비우면 외부 접속 전부 차단 (DOCKER-USER)
+postgres_allowed_sources: []
+# 만들 DB/유저 (유저는 해당 DB 의 owner)
+#   - { name: app, user: app, password: "{{ vault_app_db_password }}" }
+postgres_databases: []
+# postgres -c 옵션
+postgres_settings:
+  max_connections: 200
+  shared_buffers: 256MB
+  log_min_duration_statement: 1000   # 1초 넘는 쿼리 로그

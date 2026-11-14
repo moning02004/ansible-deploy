@@ -8,7 +8,7 @@
 | 02 | `02-gitea.yaml` | base + Gitea + act_runner + wharfline + nginx | ✅ |
 | 03 | `03-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ✅ |
 | 04 | `04-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
-| 05 | `05-postgres.yaml` | base + PostgreSQL | ⬜ |
+| 05 | `05-postgres.yaml` | base + PostgreSQL | ✅ |
 | 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ⬜ |
 | 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ⬜ |
 | 08 | `08-middleware.yaml` | RabbitMQ + Redis | ⬜ |
@@ -128,3 +128,14 @@ networks:
 - `traefik_acme_email` 을 지정하면 Let's Encrypt 자동 HTTPS
 - `app_registries` 로 private 레지스트리(ghcr.io 등) 로그인
 - 02/03 처럼 호스트 nginx 가 80/443 을 쓰는 서버와 같은 서버에 두지 마세요
+
+## 05-postgres
+- PostgreSQL 18 (`/opt/postgres`), 슈퍼유저 `postgres`
+- `postgres_databases` 로 DB/유저 생성, 비밀번호는 실행할 때마다 vault 값으로 맞춤
+- **외부 접속은 `postgres_allowed_sources` 의 CIDR 만** 허용합니다. 비우면 서버 내부에서만 접속할 수 있습니다.
+- `postgres_settings` 로 `max_connections`, `shared_buffers` 등 설정
+
+### Docker 포트 방화벽 (docker_firewall)
+Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 05/08 은 `DOCKER-USER` 체인에 출발지 제한 규칙을 넣고, `docker-firewall.service` 가 Docker 재시작/재부팅 때마다 다시 적용합니다.
+- 규칙 파일: `/etc/docker-firewall/rules.d/*.rules` (`<포트> <프로토콜> <허용 CIDR...>`)
+- 확인: `sudo iptables -S DOCKER-USER`

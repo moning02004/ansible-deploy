@@ -1,0 +1,55 @@
+- name: Create rules directory
+  ansible.builtin.file:
+    path: /etc/docker-firewall/rules.d
+    state: directory
+    mode: "0755"
+
+- name: Install apply script
+  ansible.builtin.template:
+    src: docker-firewall.sh.j2
+    dest: /usr/local/sbin/docker-firewall
+    mode: "0755"
+  notify: Apply docker firewall
+
+- name: Install systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker-firewall.service
+    content: |
+      # Ansible 관리 파일 — 직접 수정하지 마세요
+      [Unit]
+      Description=Restrict access to Docker published ports (DOCKER-USER)
+      After=docker.service
+      Requires=docker.service
+      PartOf=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/local/sbin/docker-firewall
+
+      [Install]
+      WantedBy=multi-user.target docker.service
+    mode: "0644"
+  notify: Apply docker firewall
+
+- name: Write rules for {{ docker_firewall_name }}
+  ansible.builtin.copy:
+    dest: "/etc/docker-firewall/rules.d/{{ docker_firewall_name }}.rules"
+    content: |
+      # Ansible 관리 파일 — 직접 수정하지 마세요
+      {% for r in docker_firewall_rules %}
+      {{ r.port }} {{ r.proto | default('tcp') }} {{ r.from | default([]) | join(' ') }}
+      {% endfor %}
+    mode: "0644"
+  when: docker_firewall_name | length > 0
+  notify: Apply docker firewall
+
+- name: Enable docker-firewall service
+  ansible.builtin.systemd_service:
+    name: docker-firewall
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply rules now
+  ansible.builtin.meta: flush_handlers

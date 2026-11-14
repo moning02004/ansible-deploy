@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+name: postgres
+
+services:
+  postgres:
+    image: postgres:{{ postgres_version }}
+    container_name: postgres
+    restart: unless-stopped
+    shm_size: 256m
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    command:
+      - postgres
+{% for k, v in postgres_settings.items() %}
+      - -c
+      - {{ k }}={{ v }}
+{% endfor %}
+    ports:
+      - "{{ postgres_bind }}:{{ postgres_port }}:5432"
+    volumes:
+      - data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  data:

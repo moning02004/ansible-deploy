@@ -1,0 +1,8 @@
+# Docker 로 publish 한 포트는 ufw 를 우회합니다 → DOCKER-USER 체인에서 출발지를 제한
+# 다른 role 에서 include_role 로 호출:
+#   docker_firewall_name: postgres
+#   docker_firewall_rules:
+#     - { port: 5432, proto: tcp, from: [10.0.0.0/24] }   # from 이 비면 외부 접근 전부 차단
+docker_firewall_name: ""
+docker_firewall_rules: []
+docker_firewall_interface: "{{ ansible_default_ipv4.interface | default('eth0') }}"

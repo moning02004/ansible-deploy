@@ -5,7 +5,8 @@
       - gitea_db_password | length > 0
       - gitea_admin_email | length > 0
       - gitea_admin_password | length >= 8
-    fail_msg: "gitea_domain / gitea_db_password / gitea_admin_email / gitea_admin_password(8자 이상) 를 vault 에 설정하세요"
+      - gitea_runner_docker_mode in ['dind', 'host-socket']
+    fail_msg: "gitea_domain / gitea_db_password / gitea_admin_email / gitea_admin_password(8자 이상) 를 vault 에 설정하세요 (gitea_runner_docker_mode 는 dind | host-socket)"
     quiet: true
 
 - name: Create gitea directory
@@ -69,7 +70,7 @@
   when: gitea_admin_user not in gitea_admins.stdout.split()
   no_log: true
 
-- name: Register act_runner
+- name: Register runner
   when: gitea_runner_enabled | bool
   block:
     - name: Check runner token file

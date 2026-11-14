@@ -5,7 +5,7 @@
 | # | 플레이북 | 내용 | 상태 |
 |---|---|---|---|
 | 01 | `01-base.yaml` | 공통 설정, deploy 유저, ufw, Docker, docker rollout | ✅ |
-| 02 | `02-gitea.yaml` | base + Gitea + act_runner + wharfline + nginx | ✅ |
+| 02 | `02-gitea.yaml` | base + Gitea + runner + wharfline + nginx | ✅ |
 | 03 | `03-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ✅ |
 | 04 | `04-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
 | 05 | `05-postgres.yaml` | base + PostgreSQL | ✅ |
@@ -81,14 +81,16 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 | 구성 | 위치 | 접속 |
 |---|---|---|
 | nginx | 호스트 (apt) | 80 / 443 |
-| Gitea + Postgres + act_runner | `/opt/gitea` (compose) | `http(s)://gitea_domain`, SSH `2222` |
+| Gitea + Postgres + runner | `/opt/gitea` (compose) | `http(s)://gitea_domain`, SSH `2222` |
 | wharfline | `/opt/wharfline` (저장소 `deploy/` 방식) | `http(s)://wharfline_domain` |
 
 - 필수 변수와 예시: `group_vars/all/vault.yaml.example`
-- 버전: `gitea_version` 28.3.0, `act_runner_version` 0.6.1, `wharfline_version` v2026.11.14-1
+- 버전: `gitea_version` 28.3.0, `gitea_runner_version` 6.0.0 ([gitea/runner](https://gitea.com/gitea/runner), Gitea 1.26.2+ 필요), `wharfline_version` v2026.11.14-1
 - **HTTPS**: `nginx_certbot_email` 을 지정하면 도메인마다 Let's Encrypt 인증서를 받고 HTTP → HTTPS 로 넘깁니다. Gitea ROOT_URL 과 wharfline 쿠키 Secure 도 자동으로 https 기준이 됩니다. (DNS A 레코드가 서버를 가리켜야 함, 로컬 테스트에서는 검증하지 않음)
 - **Gitea 관리자**: `gitea_admin`. `admin` 은 Gitea 예약어라 쓸 수 없습니다.
-- **act_runner**: 첫 실행 때 토큰을 발급해 자동 등록합니다. 다시 등록하려면 `/opt/gitea/runner.env` 와 `gitea_runner_data` 볼륨을 지우고 재실행하세요.
+- **runner** (구 act_runner): 첫 실행 때 토큰을 발급해 자동 등록합니다. 다시 등록하려면 `/opt/gitea/runner.env` 와 `gitea_runner_data` 볼륨을 지우고 재실행하세요.
+  - 기본은 upstream 권장인 DinD 이미지(`-dind`, privileged)라서 job 이 호스트 `docker.sock` 에 닿지 않습니다. job 이미지 캐시는 `gitea_runner_docker` 볼륨에 남습니다. 예전처럼 호스트 소켓을 쓰려면 `gitea_runner_docker_mode: host-socket`.
+  - v6 에서 `builtin:checkout` 이 빠졌으니 workflow 에서는 `actions/checkout` 을 쓰세요. 예전 `act_runner_version` 변수는 `gitea_runner_version` 으로 바뀌었습니다.
 - **wharfline 마스터 키**: `wharfline_master_key` 를 비워 두면 첫 실행 때 서버에서 만들고 `secrets/<호스트>/wharfline_master_keys` 로 가져옵니다(gitignore). **vault 로 옮기고 로컬 파일은 지우세요.** 잃으면 저장된 비밀 값을 복구할 수 없습니다.
 - **wharfline 이미지는 amd64 전용**입니다. ARM 서버에서는 `wharfline_platform: linux/amd64` 로 에뮬레이션 실행할 수 있습니다(느림).
 

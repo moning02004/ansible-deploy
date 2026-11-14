@@ -1,4 +1,4 @@
-# 02. gitea — base + nginx + Gitea + act_runner + wharfline
+# 02. gitea — base + nginx + Gitea + runner + wharfline
 #   인벤토리의 [gitea] 그룹에 적용됩니다.
 #
 # 실행:
@@ -12,7 +12,7 @@
   vars:
     base_hosts: gitea
 
-- name: "02 gitea | Gitea + act_runner + wharfline + nginx"
+- name: "02 gitea | Gitea + runner + wharfline + nginx"
   hosts: gitea
   become: true
 

@@ -62,8 +62,15 @@ services:
     logging: *logging
 {% if gitea_runner_enabled %}
 
+  # https://gitea.com/gitea/runner (구 act_runner, v6 부터 이미지/바이너리 이름이 runner / gitea-runner)
   runner:
-    image: docker.gitea.com/act_runner:{{ act_runner_version }}
+{% if gitea_runner_docker_mode == 'dind' %}
+    # 권장: 이미지에 내장된 Docker 데몬으로 job 실행 → job 이 호스트 docker.sock(=root) 에 닿지 않음
+    image: docker.gitea.com/runner:{{ gitea_runner_version }}-dind
+    privileged: true
+{% else %}
+    image: docker.gitea.com/runner:{{ gitea_runner_version }}
+{% endif %}
     container_name: gitea-runner
     restart: unless-stopped
     env_file:
@@ -77,10 +84,15 @@ services:
 {% endif %}
     volumes:
       - runner_data:/data
+{% if gitea_runner_docker_mode == 'dind' %}
+      - runner_docker:/var/lib/docker
+{% else %}
       - /var/run/docker.sock:/var/run/docker.sock
+{% endif %}
     depends_on:
       gitea:
         condition: service_healthy
+        restart: true
     logging: *logging
 {% endif %}
 
@@ -89,4 +101,7 @@ volumes:
   gitea_data:
 {% if gitea_runner_enabled %}
   runner_data:
+{% if gitea_runner_docker_mode == 'dind' %}
+  runner_docker:
+{% endif %}
 {% endif %}

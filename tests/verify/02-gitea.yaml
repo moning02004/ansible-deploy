@@ -38,7 +38,7 @@
         port: "{{ gitea_ssh_port | default(2222) }}"
         timeout: 10
 
-    - name: act_runner is registered
+    - name: runner is registered
       ansible.builtin.command: docker exec gitea-runner cat /data/.runner
       register: runner_file
       changed_when: false
@@ -56,6 +56,83 @@
       until: (runners.json.runners | default([]) | selectattr('status', 'equalto', 'online') | list | length) > 0
       retries: 10
       delay: 3
+
+    - name: runner uses latest gitea/runner DinD image without host docker.sock
+      ansible.builtin.command: >-
+        docker inspect gitea-runner --format
+        '{{ "{{" }}.Config.Image{{ "}}" }} {{ "{{" }}.HostConfig.Privileged{{ "}}" }} {{ "{{" }}range .Mounts{{ "}}" }}{{ "{{" }}.Destination{{ "}}" }},{{ "{{" }}end{{ "}}" }}'
+      register: runner_inspect
+      changed_when: false
+      failed_when: >-
+        runner_inspect.stdout is not search('docker\.gitea\.com/runner:\S+-dind true') or
+        'docker.sock' in runner_inspect.stdout
+
+    - name: Bundled Docker daemon in runner can run containers
+      ansible.builtin.command: docker exec gitea-runner docker run --rm alpine:3.22 echo dind-ok
+      register: dind_run
+      changed_when: false
+      failed_when: "'dind-ok' not in dind_run.stdout"
+      retries: 10
+      delay: 3
+      until: dind_run.rc == 0
+
+    - name: Workflow job runs on the runner end-to-end
+      vars:
+        api: http://127.0.0.1/api/v1
+        admin: "{{ gitea_admin_user | default('gitea_admin') }}"
+        repo: runner-smoke
+        workflow: |
+          on: [push]
+          jobs:
+            smoke:
+              runs-on: smoke          # tests/vars.yaml 의 gitea_runner_labels
+              steps:
+                - run: echo "hello from $(uname -s)"
+                  shell: sh
+      block:
+        - name: Create test repository
+          ansible.builtin.uri:
+            url: "{{ api }}/user/repos"
+            method: POST
+            headers: { Host: "{{ gitea_domain }}" }
+            user: "{{ admin }}"
+            password: "{{ gitea_admin_password }}"
+            force_basic_auth: true
+            body_format: json
+            body: { name: "{{ repo }}", auto_init: true, default_branch: main }
+            status_code: [201, 409]
+
+        - name: Push workflow file
+          ansible.builtin.uri:
+            url: "{{ api }}/repos/{{ admin }}/{{ repo }}/contents/.gitea/workflows/smoke.yaml"
+            method: POST
+            headers: { Host: "{{ gitea_domain }}" }
+            user: "{{ admin }}"
+            password: "{{ gitea_admin_password }}"
+            force_basic_auth: true
+            body_format: json
+            body: { content: "{{ workflow | b64encode }}", message: smoke, branch: main }
+            status_code: [201, 422]
+
+        - name: Wait for the workflow run to succeed
+          ansible.builtin.uri:
+            url: "{{ api }}/repos/{{ admin }}/{{ repo }}/actions/runs"
+            headers: { Host: "{{ gitea_domain }}" }
+            user: "{{ admin }}"
+            password: "{{ gitea_admin_password }}"
+            force_basic_auth: true
+            return_content: true
+          register: wf_runs
+          until: >-
+            (wf_runs.json.workflow_runs | default([]) | length) > 0 and
+            wf_runs.json.workflow_runs[0].status == 'completed'
+          retries: 60
+          delay: 5
+          failed_when: >-
+            wf_runs.status != 200 or
+            ((wf_runs.json.workflow_runs | default([]) | length) > 0 and
+             wf_runs.json.workflow_runs[0].status == 'completed' and
+             wf_runs.json.workflow_runs[0].conclusion != 'success')
 
     - name: wharfline responds through nginx
       ansible.builtin.uri:

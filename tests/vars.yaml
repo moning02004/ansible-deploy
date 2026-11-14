@@ -8,6 +8,8 @@ gitea_domain: git.test
 gitea_db_password: test-gitea-db
 gitea_admin_email: admin@git.test
 gitea_admin_password: test-admin-pw
+# 기본 라벨 + 가벼운 smoke 라벨 (verify 에서 실제 workflow 실행 확인용)
+gitea_runner_labels: "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest,smoke:docker://alpine:3.22"
 wharfline_domain: deploy.test
 wharfline_postgres_password: test-wharfline-db
 wharfline_owner_email: owner@deploy.test

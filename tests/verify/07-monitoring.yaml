@@ -64,3 +64,37 @@
       changed_when: false
       failed_when: ext.rc == 0
       loop: [9100, 9280, 3001]   # exporter + Grafana 직접 접근 차단
+
+    - name: Alert rules are loaded
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/rules
+        return_content: true
+      register: rules
+      failed_when: >-
+        rules.json.data.groups | map(attribute='rules') | flatten | map(attribute='name') | list
+        | intersect(['InstanceDown', 'DiskSpaceLow', 'HighMemoryUsage', 'HighLoad', 'ContainerRestarting']) | length != 5
+
+    - name: Prometheus is connected to Alertmanager
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/alertmanagers
+        return_content: true
+      register: ams
+      until: ams.json.data.activeAlertmanagers | length > 0
+      retries: 10
+      delay: 3
+
+    - name: Alertmanager accepts and lists an alert
+      ansible.builtin.shell: |
+        curl -sf -XPOST -H 'Content-Type: application/json' http://127.0.0.1:9093/api/v2/alerts \
+          -d '[{"labels":{"alertname":"VerifyAlert","severity":"warning","instance":"testhost"},"annotations":{"summary":"verify"}}]'
+        sleep 2
+        curl -sf http://127.0.0.1:9093/api/v2/alerts
+      register: am
+      changed_when: false
+      failed_when: "'VerifyAlert' not in am.stdout"
+
+    - name: Alertmanager listens on localhost only
+      ansible.builtin.shell: ss -ltnH | awk '{print $4}'
+      register: amlisten
+      changed_when: false
+      failed_when: amlisten.stdout is search('(0\.0\.0\.0|\*|\[::\]):9093\b')

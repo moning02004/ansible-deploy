@@ -1,0 +1,46 @@
+# {{ ansible_managed }}
+groups:
+  - name: orca-hosts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ '{{' }} $labels.instance {{ '}}' }} ({{ '{{' }} $labels.job {{ '}}' }}) 응답 없음"
+          description: "2분 넘게 수집되지 않습니다. 서버나 exporter 가 내려갔는지 확인하세요."
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) * 100 < {{ alert_disk_free_percent }}
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ '{{' }} $labels.instance {{ '}}' }} 디스크 {{ '{{' }} $labels.mountpoint {{ '}}' }} 여유 공간 {{ '{{' }} printf \"%.0f\" $value {{ '}}' }}%"
+          description: "여유 공간이 {{ alert_disk_free_percent }}% 미만입니다. docker system prune, 오래된 백업 정리를 확인하세요."
+
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > {{ alert_memory_used_percent }}
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ '{{' }} $labels.instance {{ '}}' }} 메모리 사용률 {{ '{{' }} printf \"%.0f\" $value {{ '}}' }}%"
+          description: "10분 넘게 {{ alert_memory_used_percent }}% 를 넘었습니다."
+
+      - alert: HighLoad
+        expr: node_load15 / count without (cpu, mode) (node_cpu_seconds_total{mode="idle"}) > {{ alert_load_per_core }}
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ '{{' }} $labels.instance {{ '}}' }} 부하가 코어당 {{ '{{' }} printf \"%.1f\" $value {{ '}}' }}"
+          description: "15분 평균 부하가 코어당 {{ alert_load_per_core }} 을 넘었습니다."
+
+  - name: orca-containers
+    rules:
+      - alert: ContainerRestarting
+        expr: increase(container_start_time_seconds{name!=""}[15m]) > 0 and on (name, instance) (time() - container_start_time_seconds{name!=""}) < 300
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ '{{' }} $labels.instance {{ '}}' }} 컨테이너 {{ '{{' }} $labels.name {{ '}}' }} 가 반복 재시작"
+          description: "10분 넘게 재시작이 이어집니다. docker logs {{ '{{' }} $labels.name {{ '}}' }} 를 확인하세요."

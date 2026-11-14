@@ -13,7 +13,7 @@
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: "0755"
-  loop: ["", grafana/provisioning/datasources, grafana/provisioning/dashboards, grafana/dashboards]
+  loop: ["", rules, grafana/provisioning/datasources, grafana/provisioning/dashboards, grafana/dashboards]
 
 - name: Write .env (secrets)
   ansible.builtin.copy:
@@ -24,12 +24,25 @@
     mode: "0600"
   no_log: true
 
-- name: Write prometheus.yml
+- name: Write Prometheus config and alert rules
   ansible.builtin.template:
-    src: prometheus.yml.j2
-    dest: "{{ monitoring_dir }}/prometheus.yml"
+    src: "{{ item.src }}"
+    dest: "{{ monitoring_dir }}/{{ item.dest }}"
     mode: "0644"
+  loop:
+    - { src: prometheus.yml.j2, dest: prometheus.yml }
+    - { src: alerts.yml.j2, dest: rules/alerts.yml }
   register: prom_cfg
+
+- name: Write alertmanager.yml
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ monitoring_dir }}/alertmanager.yml"
+    owner: "65534"        # 컨테이너는 nobody 로 실행. 웹훅 주소 등 비밀 값이 있어 0600 유지
+    group: "65534"
+    mode: "0600"
+  register: am_cfg
+  no_log: true
 
 - name: Write docker-compose.yml
   ansible.builtin.template:
@@ -49,6 +62,13 @@
           access: proxy
           url: http://127.0.0.1:{{ prometheus_port }}
           isDefault: true
+        - name: Alertmanager
+          uid: alertmanager
+          type: alertmanager
+          access: proxy
+          url: http://127.0.0.1:{{ alertmanager_port }}
+          jsonData:
+            implementation: prometheus
     mode: "0644"
   register: ds_cfg
 
@@ -110,6 +130,17 @@
   when: prom_cfg is changed
   register: prom_reload
   until: prom_reload.status == 200
+  retries: 10
+  delay: 3
+  changed_when: true
+
+- name: Reload Alertmanager config
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ alertmanager_port }}/-/reload"
+    method: POST
+  when: am_cfg is changed
+  register: am_reload
+  until: am_reload.status == 200
   retries: 10
   delay: 3
   changed_when: true

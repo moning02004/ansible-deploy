@@ -4,6 +4,18 @@ monitoring_dir: /opt/monitoring
 prometheus_port: 9090                # 127.0.0.1 에만
 prometheus_retention: 15d
 prometheus_scrape_interval: 30s
+alertmanager_version: "v0.35.0"      # https://hub.docker.com/r/prom/alertmanager
+alertmanager_port: 9093              # 127.0.0.1 에만
+# 알림 채널 (값을 넣은 곳으로 보냄. 모두 비우면 Alertmanager 화면에서만 확인)
+alert_slack_webhook_url: ""
+alert_slack_channel: "#alerts"
+alert_telegram_bot_token: ""
+alert_telegram_chat_id: 0
+alert_webhook_url: ""                # 임의의 웹훅 (예: 사내 메신저 연동)
+# 경보 기준
+alert_disk_free_percent: 15
+alert_memory_used_percent: 90
+alert_load_per_core: 2
 grafana_port: 3001                   # Traefik 네트워크에서만 접근 허용 (ufw). 3000 은 Gitea 와 겹쳐서 3001
 grafana_domain: ""                   # 필수. 예) grafana.example.com
 grafana_root_url: "{{ site_scheme | default('http') }}://{{ grafana_domain }}/"

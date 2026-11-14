@@ -19,7 +19,23 @@ services:
       - --web.enable-lifecycle
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
+    logging: *logging
+
+  alertmanager:
+    image: prom/alertmanager:{{ alertmanager_version }}
+    container_name: alertmanager
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=127.0.0.1:{{ alertmanager_port }}
+      - --cluster.listen-address=
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
     logging: *logging
 
   grafana:
@@ -42,4 +58,5 @@ services:
 
 volumes:
   prometheus_data:
+  alertmanager_data:
   grafana_data:

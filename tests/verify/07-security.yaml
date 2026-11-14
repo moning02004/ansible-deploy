@@ -57,6 +57,8 @@
         argv: [ansible-playbook, -i, tests/inventory.ini, -e, "@tests/vars.yaml",
                -e, '{"deploy_user_ssh_keys": []}', 07-security.yaml, --tags, security]
       delegate_to: localhost
+      args:
+        chdir: "{{ playbook_dir }}/../.."   # 저장소 루트
       become: false
       register: guard
       changed_when: false

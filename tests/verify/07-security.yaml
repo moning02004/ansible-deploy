@@ -1,0 +1,63 @@
+# 07-security 결과 점검
+- name: "verify | 07 security"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Effective sshd settings
+      ansible.builtin.command: /usr/sbin/sshd -T
+      register: sshdt
+      changed_when: false
+      failed_when: >-
+        'permitrootlogin no' not in sshdt.stdout or
+        'passwordauthentication no' not in sshdt.stdout or
+        'maxauthtries 4' not in sshdt.stdout or
+        'x11forwarding no' not in sshdt.stdout
+
+    - name: ssh service is running
+      ansible.builtin.command: systemctl is-active ssh
+      changed_when: false
+
+    - name: fail2ban sshd jail is active
+      ansible.builtin.command: fail2ban-client status sshd
+      register: jail
+      changed_when: false
+      failed_when: "'Currently banned' not in jail.stdout"
+
+    - name: fail2ban can ban and unban
+      ansible.builtin.shell: |
+        fail2ban-client set sshd banip 203.0.113.9 >/dev/null
+        fail2ban-client status sshd | grep -q 203.0.113.9
+        fail2ban-client set sshd unbanip 203.0.113.9 >/dev/null
+      changed_when: false
+
+    - name: Admin IP is ignored
+      ansible.builtin.command: fail2ban-client get sshd ignoreip
+      register: ign
+      changed_when: false
+      failed_when: "'192.0.2.10' not in ign.stdout"
+
+    - name: Automatic security updates enabled
+      ansible.builtin.shell: apt-config dump | grep -E '^APT::Periodic::Unattended-Upgrade "1"'
+      changed_when: false
+
+    - name: ufw is still active and allows SSH
+      ansible.builtin.command: ufw status
+      register: ufw
+      changed_when: false
+      failed_when: "'Status: active' not in ufw.stdout or ufw.stdout is not search('22/tcp\\s+ALLOW')"
+
+    - name: docker-firewall service is active
+      ansible.builtin.command: systemctl is-active docker-firewall
+      changed_when: false
+
+    - name: Lockout guard refuses to disable password login without SSH keys
+      ansible.builtin.command:
+        argv: [ansible-playbook, -i, tests/inventory.ini, -e, "@tests/vars.yaml",
+               -e, '{"deploy_user_ssh_keys": []}', 07-security.yaml, --tags, security]
+      delegate_to: localhost
+      become: false
+      register: guard
+      changed_when: false
+      failed_when: guard.rc == 0 or 'SSH 잠김 위험' not in guard.stdout

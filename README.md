@@ -10,7 +10,7 @@
 | 04 | `04-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
 | 05 | `05-postgres.yaml` | base + PostgreSQL | ✅ |
 | 06 | `06-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ✅ |
-| 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ⬜ |
+| 07 | `07-security.yaml` | 방화벽 규칙 재적용, fail2ban, SSH 강화, 보안 업데이트 자동 설치 (단독 실행용) | ✅ |
 | 08 | `08-middleware.yaml` | RabbitMQ + Redis | ⬜ |
 | 09 | `09-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ⬜ |
 | 10 | `10-restore.yaml` | 백업 파일로 복구 | ⬜ |
@@ -149,3 +149,15 @@ Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 05/08 은 `DOCK
 - Grafana 에 Prometheus 데이터소스와 **Node Exporter Full** 대시보드가 자동으로 들어갑니다 (`grafana_dashboards` 로 추가).
 - 서버를 추가하면 06 을 다시 실행하세요. Prometheus 수집 대상이 인벤토리에서 다시 만들어집니다.
 - 모든 컨테이너는 host 네트워크라 ufw 규칙을 그대로 따릅니다.
+
+## 07-security
+모든 서버에 적용하는 운영용 플레이북입니다. 허용 IP 를 바꿨을 때도 이것만 다시 돌리면 됩니다.
+
+| 항목 | 내용 |
+|---|---|
+| 방화벽 | ufw 규칙(`firewall_*`)과 Docker 포트 규칙(05/08 의 rules.d) 재적용 |
+| SSH | root 로그인 차단, `security_disable_password_auth: true` 면 비밀번호 로그인 차단, MaxAuthTries 4 등 |
+| fail2ban | sshd 5회 실패 → 1시간 차단, `security_fail2ban_ignoreip` 로 관리자 IP 제외 |
+| 업데이트 | unattended-upgrades 로 보안 업데이트 자동 설치 (`security_auto_reboot` 로 자동 재부팅) |
+
+**잠김 방지**: 비밀번호 로그인을 막으려면 `deploy_user_ssh_keys` 가 있어야 하고, root 로그인을 막으려면 Ansible 이 root 가 아닌 계정으로 접속해야 합니다. 조건이 안 맞으면 실행 전에 중단합니다. 비밀번호 로그인을 막기 전에 **인벤토리를 SSH 키 접속(`ansible_user=manager`, `ansible_ssh_private_key_file=...`)으로 바꾸세요.**

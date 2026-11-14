@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+# sshd 는 처음 읽은 값을 쓰므로 00- 접두사로 cloud-init(50-) 설정보다 먼저 읽히게 함
+PermitRootLogin {{ security_permit_root_login }}
+{% if security_disable_password_auth %}
+PasswordAuthentication no
+{% endif %}
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+X11Forwarding no
+MaxAuthTries 4
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+{% if security_ssh_allow_users %}
+AllowUsers {{ security_ssh_allow_users | join(' ') }}
+{% endif %}

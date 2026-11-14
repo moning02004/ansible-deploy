@@ -1,0 +1,2 @@
+# 07 은 운영용(단독 실행)이라 base 가 깔린 서버를 먼저 준비
+- import_playbook: ../../01-base.yaml

@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# 저장소의 deploy/docker-compose.yml 은 그대로 두고, compose 가 자동으로 읽는 이 파일로 덧붙입니다.
+#  - frontend 를 Traefik 네트워크에 붙이고 라우팅 라벨 추가
+#  - wharfline_platform 지정 시(ARM 서버 에뮬레이션) 앱 이미지 platform + 느슨한 healthcheck
+services:
+  frontend:
+    networks: [default, {{ traefik_network | default('web') }}]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.wharfline.rule: "Host(`{{ wharfline_domain }}`)"
+      traefik.http.services.wharfline.loadbalancer.server.port: "80"
+{% if wharfline_platform %}
+    platform: {{ wharfline_platform }}
+  migrate:
+    platform: {{ wharfline_platform }}
+  backend:
+    platform: {{ wharfline_platform }}
+    # 에뮬레이션에선 이미지 헬스체크(python, timeout 3s)가 자주 시간 초과 → 완화 (test 는 이미지 것 사용)
+    healthcheck: { interval: 15s, timeout: 20s, retries: 10, start_period: 120s }
+{% endif %}
+
+networks:
+  {{ traefik_network | default('web') }}:
+    external: true

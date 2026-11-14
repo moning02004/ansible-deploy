@@ -1,9 +1,9 @@
-# 04. gitlab — base + nginx + GitLab CE + gitlab-runner + wharfline   (03-gitea 의 GitLab 버전)
+# 04. gitlab — base + Traefik + GitLab CE + gitlab-runner + wharfline   (03-gitea 의 GitLab 버전)
 #   인벤토리의 [gitlab] 그룹에 적용됩니다. 메모리 4GB 이상 권장 (8GB 이상이면 gitlab_low_memory: false)
 #
 # 실행:
 #   ansible-playbook -i inventory/all.ini.vault 04-gitlab.yaml --vault-password-file vault_password.txt
-#   일부만: --tags nginx | gitlab | wharfline
+#   일부만: --tags traefik | gitlab | wharfline
 #
 # 필수 변수 (vault): gitlab_domain, gitlab_root_password,
 #                    wharfline_domain, wharfline_postgres_password, wharfline_owner_email, wharfline_owner_password
@@ -11,23 +11,14 @@
   vars:
     base_hosts: gitlab
 
-- name: "04 gitlab | GitLab CE + gitlab-runner + wharfline + nginx"
+- name: "04 gitlab | GitLab CE + gitlab-runner + wharfline + Traefik"
   hosts: gitlab
   become: true
 
   vars:
-    site_scheme: "{{ 'https' if (nginx_certbot_email | default('')) | length > 0 else 'http' }}"
-    nginx_sites:
-      - name: gitlab
-        server_name: "{{ gitlab_domain }}"
-        upstream: "http://127.0.0.1:{{ gitlab_http_port | default(8929) }}"
-        client_max_body_size: 1g
-      - name: wharfline
-        server_name: "{{ wharfline_domain }}"
-        upstream: "http://127.0.0.1:{{ wharfline_web_port | default(8080) }}"
-        sse: true
+    site_scheme: "{{ 'https' if (traefik_acme_email | default('')) | length > 0 else 'http' }}"
 
   roles:
-    - { role: nginx,     tags: [nginx] }
+    - { role: traefik,   tags: [traefik] }
     - { role: gitlab,    tags: [gitlab] }
     - { role: wharfline, tags: [wharfline] }

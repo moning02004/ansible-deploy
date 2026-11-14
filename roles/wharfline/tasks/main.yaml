@@ -16,11 +16,32 @@
       ARM 서버라면 wharfline_platform: linux/amd64 로 에뮬레이션 실행할 수 있습니다 (느림)
     quiet: true
 
-- name: Install amd64 emulation (ARM server)
-  ansible.builtin.apt:
-    name: [qemu-user-static, binfmt-support]
-    state: present
+- name: Register amd64 emulation (ARM server, binfmt container)
   when: wharfline_platform | length > 0 and ansible_architecture != 'x86_64' and wharfline_install_qemu | bool
+  block:
+    - name: Install binfmt service (re-registers after reboot)
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/binfmt-amd64.service
+        content: |
+          # Ansible 관리 파일 — 직접 수정하지 마세요
+          [Unit]
+          Description=Register amd64 emulation (qemu via tonistiigi/binfmt)
+          After=docker.service
+          Requires=docker.service
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/usr/bin/docker run --rm --privileged {{ wharfline_binfmt_image }} --install amd64
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+      register: binfmt_unit
+    - name: Enable binfmt service
+      ansible.builtin.systemd_service:
+        name: binfmt-amd64
+        enabled: true
+        state: started
+        daemon_reload: "{{ binfmt_unit is changed }}"
 
 - name: Create directories
   ansible.builtin.file:
@@ -53,30 +74,13 @@
     mode: "0600"
   no_log: true
 
-# 앱 이미지(migrate/backend/frontend)에만 platform 지정. postgres 등 공용 이미지는 서버 기본 아키텍처 유지
-- name: Write docker-compose.override.yml (platform)
-  ansible.builtin.copy:
+- name: Write docker-compose.override.yml (Traefik routing, platform)
+  ansible.builtin.template:
+    src: docker-compose.override.yml.j2
     dest: "{{ wharfline_dir }}/docker-compose.override.yml"
-    content: |
-      # Ansible 관리 파일 (wharfline_platform)
-      # 에뮬레이션에선 이미지 헬스체크(python, timeout 3s)가 자주 시간 초과 → timeout/유예 시간 완화
-      # (test 를 비워 두면 이미지의 HEALTHCHECK 명령을 그대로 씀)
-      services:
-        migrate:  { platform: {{ wharfline_platform }} }
-        backend:
-          platform: {{ wharfline_platform }}
-          healthcheck: { interval: 15s, timeout: 20s, retries: 10, start_period: 120s }
-        frontend: { platform: {{ wharfline_platform }} }
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: "0644"
-  when: wharfline_platform | length > 0
-
-- name: Remove platform override
-  ansible.builtin.file:
-    path: "{{ wharfline_dir }}/docker-compose.override.yml"
-    state: absent
-  when: wharfline_platform | length == 0
 
 - name: Install master key from vault
   ansible.builtin.copy:

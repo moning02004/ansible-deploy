@@ -1,34 +1,25 @@
-# 03. gitea — base + nginx + Gitea + act_runner + wharfline
+# 03. gitea — base + Traefik + Gitea + act_runner + wharfline
 #   인벤토리의 [gitea] 그룹에 적용됩니다.
 #
 # 실행:
 #   ansible-playbook -i inventory/all.ini.vault 03-gitea.yaml --vault-password-file vault_password.txt
-#   일부만: --tags nginx | gitea | wharfline   (base 건너뛰기: --skip-tags common,user,firewall,docker)
+#   일부만: --tags traefik | gitea | wharfline   (base 건너뛰기: --skip-tags common,user,firewall,docker)
 #
 # 필수 변수 (vault): gitea_domain, gitea_db_password, gitea_admin_email, gitea_admin_password,
 #                    wharfline_domain, wharfline_postgres_password, wharfline_owner_email, wharfline_owner_password
-# HTTPS: nginx_certbot_email 을 지정하면 Let's Encrypt 인증서 발급 (도메인 DNS 가 이 서버를 가리켜야 함)
+# HTTPS: traefik_acme_email 을 지정하면 Let's Encrypt 인증서 자동 발급/갱신 (도메인 DNS 가 이 서버를 가리켜야 함)
 - import_playbook: 01-base.yaml
   vars:
     base_hosts: gitea
 
-- name: "03 gitea | Gitea + act_runner + wharfline + nginx"
+- name: "03 gitea | Gitea + act_runner + wharfline + Traefik"
   hosts: gitea
   become: true
 
   vars:
-    site_scheme: "{{ 'https' if (nginx_certbot_email | default('')) | length > 0 else 'http' }}"
-    nginx_sites:
-      - name: gitea
-        server_name: "{{ gitea_domain }}"
-        upstream: "http://127.0.0.1:{{ gitea_http_port | default(3000) }}"
-        client_max_body_size: 512m          # 큰 저장소 push / LFS
-      - name: wharfline
-        server_name: "{{ wharfline_domain }}"
-        upstream: "http://127.0.0.1:{{ wharfline_web_port | default(8080) }}"
-        sse: true                            # 배포 로그 실시간 스트리밍
+    site_scheme: "{{ 'https' if (traefik_acme_email | default('')) | length > 0 else 'http' }}"
 
   roles:
-    - { role: nginx,     tags: [nginx] }
+    - { role: traefik,   tags: [traefik] }
     - { role: gitea,     tags: [gitea] }
     - { role: wharfline, tags: [wharfline] }

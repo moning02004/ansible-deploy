@@ -1,12 +1,36 @@
-- name: Create traefik directory
+- name: Create traefik directories
   ansible.builtin.file:
-    path: "{{ traefik_dir }}"
+    path: "{{ item }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: "0750"
+  loop: ["{{ traefik_dir }}", "{{ traefik_dir }}/dynamic"]
 
-- name: Create shared network for apps
+- name: Create access log directory
+  ansible.builtin.file:
+    path: /var/log/traefik
+    state: directory
+    mode: "0755"
+  when: traefik_access_log | bool
+
+- name: Rotate access log daily (keep 14)
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/traefik
+    content: |
+      /var/log/traefik/*.log {
+        daily
+        rotate 14
+        compress
+        delaycompress
+        missingok
+        notifempty
+        copytruncate
+      }
+    mode: "0644"
+  when: traefik_access_log | bool
+
+- name: Create shared network for routed containers
   community.docker.docker_network:
     name: "{{ traefik_network }}"
 
@@ -14,6 +38,14 @@
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ traefik_dir }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+
+- name: Write file routes (host services)
+  ansible.builtin.template:
+    src: routes.yml.j2
+    dest: "{{ traefik_dir }}/dynamic/routes.yml"
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: "0644"

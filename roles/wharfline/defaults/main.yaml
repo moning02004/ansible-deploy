@@ -11,7 +11,8 @@ wharfline_web_bind: 127.0.0.1
 wharfline_web_port: 8080
 # ARM 서버에서 amd64 이미지를 에뮬레이션으로 돌릴 때: linux/amd64
 wharfline_platform: ""
-wharfline_install_qemu: true
+wharfline_install_qemu: true          # ARM 서버에서 qemu(binfmt) 등록
+wharfline_binfmt_image: "tonistiigi/binfmt:qemu-v10.2.3-68"
 
 wharfline_postgres_password: ""       # 필수 (vault)
 wharfline_owner_email: ""             # 필수. 빈 DB 에 처음 만들 Owner

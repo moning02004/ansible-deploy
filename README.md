@@ -6,8 +6,8 @@
 |---|---|---|---|
 | 01 | `01-base.yaml` | 공통 설정, deploy 유저, ufw, Docker, docker rollout | ✅ |
 | 02 | `02-kubernetes.yaml` | base(Docker) + Kubernetes 단일 노드 (kubeadm, Flannel, Helm, metrics-server, local-path, Traefik ingress, etcd 백업) | ✅ |
-| 03 | `03-gitea.yaml` | base + Gitea + act_runner + wharfline + nginx | ✅ |
-| 04 | `04-gitlab.yaml` | base + GitLab CE + gitlab-runner + wharfline + nginx | ✅ |
+| 03 | `03-gitea.yaml` | base + Traefik + Gitea + act_runner + wharfline | ✅ |
+| 04 | `04-gitlab.yaml` | base + Traefik + GitLab CE + gitlab-runner + wharfline | ✅ |
 | 05 | `05-app.yaml` | base + Traefik + 배포 디렉터리 (CI가 배포하는 대상 서버, docker rollout 무중단 배포) | ✅ |
 | 06 | `06-postgres.yaml` | base + PostgreSQL | ✅ |
 | 07 | `07-monitoring.yaml` | Prometheus + Grafana, 모든 서버에 node-exporter / cAdvisor | ✅ |
@@ -80,7 +80,7 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 | `docker_rollout_version` | `v0.14` | |
 
 > ⚠️ Docker로 publish한 포트(`-p 5432:5432`)는 ufw를 우회해서 외부에 열립니다.
-> nginx 뒤에 둘 서비스는 `127.0.0.1:포트`로만 바인딩하세요. 외부 접근 제어는 07-security에서 다룹니다.
+> Traefik 뒤에 둘 서비스는 포트를 publish 하지 말고 `web` 네트워크 + 라벨로 연결하세요. 외부 접근 제어는 07-security에서 다룹니다.
 
 ## 02-kubernetes
 Docker(01-base) 위에 **kubeadm 으로 단일 노드 Kubernetes** 를 설치합니다. Docker 와 Kubernetes 가 같은 containerd 를 나눠 써서(Docker: `moby` / k8s: `k8s.io` 네임스페이스) docker compose 서비스와 kubectl/helm 을 한 서버에서 같이 쓸 수 있습니다.
@@ -99,7 +99,7 @@ Docker(01-base) 위에 **kubeadm 으로 단일 노드 Kubernetes** 를 설치합
 - 인벤토리 `[kubernetes]` 그룹에 적용. control-plane 에도 일반 Pod 가 뜹니다(`k8s_control_plane_schedulable`).
 - 서버에서: `kubectl get pods -A` (deploy 유저도 `~/.kube/config` 로 바로 사용, `k` 별칭 + 자동완성)
 - **원격 kubectl**: `k8s_api_allowed_sources` 에 내 IP 대역, `k8s_api_cert_sans` 에 접속할 도메인/IP 를 넣고 실행 → 서버의 `~/.kube/config` 를 가져와 `server:` 주소만 바꿔 쓰세요. 기본은 6443 을 열지 않습니다.
-- **ingress 예시**: `Ingress` 를 만들고 도메인 DNS 를 서버로 향하게 하면 Traefik 이 80/443 에서 받습니다. ⚠️ hostPort 80/443 을 쓰므로 03-gitea(nginx), 05-app(traefik) 과 같은 서버에 두지 마세요 (`k8s_ingress_enabled: false` 로 끌 수 있음).
+- **ingress 예시**: `Ingress` 를 만들고 도메인 DNS 를 서버로 향하게 하면 Traefik 이 80/443 에서 받습니다. ⚠️ hostPort 80/443 을 쓰므로 03 · 04 · 05 · 07(Traefik 80/443) 과 같은 서버에 두지 마세요 (`k8s_ingress_enabled: false` 로 끌 수 있음).
 - 방화벽: Pod 대역(10.244.0.0/16) → 노드 허용, ingress 켜면 80/443 허용.
 - 애드온 매니페스트는 `/etc/kubernetes/addons/<이름>/` (kustomization) 에 남고, `kubectl diff` 로 바뀐 게 있을 때만 적용합니다.
 - etcd 수동 백업: `sudo k8s-etcd-backup`, 복구는 [공식 문서](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster) 참고.
@@ -109,13 +109,13 @@ Docker(01-base) 위에 **kubeadm 으로 단일 노드 Kubernetes** 를 설치합
 ## 03-gitea
 | 구성 | 위치 | 접속 |
 |---|---|---|
-| nginx | 호스트 (apt) | 80 / 443 |
+| Traefik | `/opt/traefik` (컨테이너, 03/04/05/07 공용) | 80 / 443 |
 | Gitea + Postgres + act_runner | `/opt/gitea` (compose) | `http(s)://gitea_domain`, SSH `2222` |
 | wharfline | `/opt/wharfline` (저장소 `deploy/` 방식) | `http(s)://wharfline_domain` |
 
 - 필수 변수와 예시: `group_vars/all/vault.yaml.example`
 - 버전: `gitea_version` 28.3.0, `act_runner_version` 0.6.1, `wharfline_version` v2026.11.14-1
-- **HTTPS**: `nginx_certbot_email` 을 지정하면 도메인마다 Let's Encrypt 인증서를 받고 HTTP → HTTPS 로 넘깁니다. Gitea ROOT_URL 과 wharfline 쿠키 Secure 도 자동으로 https 기준이 됩니다. (DNS A 레코드가 서버를 가리켜야 함, 로컬 테스트에서는 검증하지 않음)
+- **HTTPS**: `traefik_acme_email` 을 지정하면 Traefik 이 도메인마다 Let's Encrypt 인증서를 받고 갱신하며 HTTP → HTTPS 로 넘깁니다. Gitea ROOT_URL 과 wharfline 쿠키 Secure 도 자동으로 https 기준이 됩니다. (DNS A 레코드가 서버를 가리켜야 함, 로컬 테스트에서는 검증하지 않음)
 - **Gitea 관리자**: `gitea_admin`. `admin` 은 Gitea 예약어라 쓸 수 없습니다.
 - **act_runner**: 첫 실행 때 토큰을 발급해 자동 등록합니다. 다시 등록하려면 `/opt/gitea/runner.env` 와 `gitea_runner_data` 볼륨을 지우고 재실행하세요.
 - **wharfline 마스터 키**: `wharfline_master_key` 를 비워 두면 첫 실행 때 서버에서 만들고 `secrets/<호스트>/wharfline_master_keys` 로 가져옵니다(gitignore). **vault 로 옮기고 로컬 파일은 지우세요.** 잃으면 저장된 비밀 값을 복구할 수 없습니다.
@@ -156,7 +156,7 @@ networks:
 
 - `traefik_acme_email` 을 지정하면 Let's Encrypt 자동 HTTPS
 - `app_registries` 로 private 레지스트리(ghcr.io 등) 로그인
-- 03/04 처럼 호스트 nginx 가 80/443 을 쓰는 서버와 같은 서버에 두지 마세요
+- 03/04/07 과 같은 Traefik 을 공유하므로 한 서버에 함께 둘 수 있습니다 (02-kubernetes 와는 80/443 이 겹침)
 
 ## 06-postgres
 - PostgreSQL 18 (`/opt/postgres`), 슈퍼유저 `postgres`
@@ -172,7 +172,7 @@ Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 06/09 는 전�
 ## 07-monitoring
 | 대상 | 구성 |
 |---|---|
-| `[monitoring]` | Prometheus (127.0.0.1:9090), Grafana (127.0.0.1:3001 → nginx `grafana_domain`) |
+| `[monitoring]` | Prometheus (127.0.0.1:9090), Grafana (:3001, Traefik 네트워크에서만 허용 → `grafana_domain`) |
 | 모든 서버 (`monitoring_targets`, 기본 all) | node-exporter :9100, cAdvisor :9280 — 모니터링 서버 IP 에서만 접근 허용 |
 
 - Grafana 에 Prometheus 데이터소스와 **Node Exporter Full** 대시보드가 자동으로 들어갑니다 (`grafana_dashboards` 로 추가).

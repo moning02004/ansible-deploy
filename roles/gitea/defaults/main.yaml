@@ -4,7 +4,7 @@ gitea_dir: /opt/gitea
 
 gitea_domain: ""                   # 필수. 예) git.example.com
 gitea_root_url: "{{ site_scheme | default('http') }}://{{ gitea_domain }}/"
-gitea_http_port: 3000              # 127.0.0.1 에만 바인딩 (nginx 가 프록시)
+gitea_http_port: 3000              # 127.0.0.1 에만 바인딩 (서버 안에서 직접 확인용. 외부는 Traefik)
 gitea_ssh_port: 2222               # git clone ssh://git@도메인:2222/...
 gitea_disable_registration: true
 

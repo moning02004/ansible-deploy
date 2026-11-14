@@ -16,7 +16,7 @@ services:
       GITLAB_ROOT_PASSWORD: ${GITLAB_ROOT_PASSWORD:?}
       GITLAB_OMNIBUS_CONFIG: |
         external_url '{{ gitlab_external_url }}'
-        # TLS 는 호스트 nginx 가 처리 → 컨테이너 안 nginx 는 HTTP 80 만
+        # TLS 는 Traefik 이 처리 → 컨테이너 안 nginx 는 HTTP 80 만
         nginx['listen_port'] = 80
         nginx['listen_https'] = false
         nginx['proxy_set_headers'] = { "X-Forwarded-Proto" => "{{ site_scheme | default('http') }}", "X-Forwarded-Ssl" => "{{ 'on' if (site_scheme | default('http')) == 'https' else 'off' }}" }
@@ -31,6 +31,11 @@ services:
         gitlab_rails['env'] = { 'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000' }
         gitaly['env'] = { 'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000', 'GITALY_COMMAND_SPAWN_MAX_PARALLEL' => '2' }
 {% endif %}
+    networks: [default, {{ traefik_network | default('web') }}]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.gitlab.rule: "Host(`{{ gitlab_domain }}`)"
+      traefik.http.services.gitlab.loadbalancer.server.port: "80"
     ports:
       - "127.0.0.1:{{ gitlab_http_port }}:80"
       - "{{ gitlab_ssh_port }}:22"
@@ -57,6 +62,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     logging: *logging
 {% endif %}
+
+networks:
+  default: {}
+  {{ traefik_network | default('web') }}:
+    external: true
 
 volumes:
   config:

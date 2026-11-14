@@ -13,9 +13,9 @@ server1
 [gitea]        ; 03
 server1
 
-[gitlab]       ; 04  (03 과 같은 서버에 두지 않기: nginx 사이트/포트 겹침)
+[gitlab]       ; 04  (03 과 같은 서버에 두지 않기: wharfline · SSH 2222 겹침)
 
-[app]          ; 05  (03/04 와 같은 서버에 두지 않기: 80/443 겹침)
+[app]          ; 05
 
 [postgres]     ; 06
 

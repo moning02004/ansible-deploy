@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_ADDR: 0.0.0.0     # host 네트워크: 외부는 ufw 가 막고 Traefik 네트워크만 허용
       GF_SERVER_HTTP_PORT: "{{ grafana_port }}"
       GF_SERVER_ROOT_URL: "{{ grafana_root_url }}"
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}

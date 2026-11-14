@@ -7,11 +7,17 @@
   gather_facts: false
 
   tasks:
-    - name: nginx config is valid
-      ansible.builtin.command: nginx -t
+    - name: Traefik is healthy
+      ansible.builtin.command: docker inspect -f '{{ "{{" }}.State.Health.Status{{ "}}" }}' traefik
+      register: th
+      changed_when: false
+      failed_when: th.stdout != 'healthy'
+
+    - name: Traefik access log is written
+      ansible.builtin.shell: curl -s -o /dev/null http://127.0.0.1/ && sleep 1 && test -s /var/log/traefik/access.log
       changed_when: false
 
-    - name: Gitea responds through nginx
+    - name: Gitea responds through Traefik
       ansible.builtin.uri:
         url: http://127.0.0.1/api/healthz
         headers: { Host: "{{ gitea_domain }}" }
@@ -57,7 +63,7 @@
       retries: 10
       delay: 3
 
-    - name: wharfline responds through nginx
+    - name: wharfline responds through Traefik
       ansible.builtin.uri:
         url: http://127.0.0.1/
         headers: { Host: "{{ wharfline_domain }}" }

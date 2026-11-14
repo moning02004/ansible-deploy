@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+# 컨테이너가 아닌 호스트 서비스로 보내는 라우트 (traefik_file_routes)
+{% if traefik_file_routes %}
+http:
+  routers:
+{% for r in traefik_file_routes %}
+    {{ r.name }}:
+      rule: "Host(`{{ r.host }}`)"
+      service: {{ r.name }}
+{% endfor %}
+  services:
+{% for r in traefik_file_routes %}
+    {{ r.name }}:
+      loadBalancer:
+        servers:
+          - url: "{{ r.url }}"
+{% endfor %}
+{% else %}
+{}
+{% endif %}

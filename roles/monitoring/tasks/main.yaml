@@ -80,6 +80,22 @@
     replace: prometheus
   loop: "{{ grafana_dashboards }}"
 
+- name: Find Traefik network subnet
+  community.docker.docker_network_info:
+    name: "{{ traefik_network | default('web') }}"
+  register: web_net
+
+- name: Allow Grafana only from the Traefik network
+  community.general.ufw:
+    rule: allow
+    port: "{{ grafana_port | string }}"
+    proto: tcp
+    from_ip: "{{ item.Subnet }}"
+    comment: grafana-via-traefik
+  loop: "{{ web_net.network.IPAM.Config }}"
+  loop_control:
+    label: "{{ item.Subnet }}"
+
 - name: Start Prometheus and Grafana
   community.docker.docker_compose_v2:
     project_src: "{{ monitoring_dir }}"

@@ -1,7 +1,7 @@
 # 05. app — base + Traefik + 배포 디렉터리   (CI / wharfline 이 배포하는 대상 서버)
 #   인벤토리의 [app] 그룹에 적용됩니다.
 #   앞단 프록시로 Traefik 을 씁니다: 컨테이너 라벨로 라우팅되므로 docker rollout 무중단 배포가 됩니다.
-#   (03/04 처럼 호스트 nginx 가 80/443 을 쓰는 서버와 같은 서버에 두지 마세요)
+#   03/04/07 도 같은 Traefik role 을 쓰므로 한 서버에 함께 둘 수 있습니다 (02-kubernetes 와는 80/443 이 겹침)
 #
 # 실행:
 #   ansible-playbook -i inventory/all.ini.vault 05-app.yaml --vault-password-file vault_password.txt

@@ -10,10 +10,18 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network={{ traefik_network }}
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      - --entrypoints.web.transport.respondingTimeouts.readTimeout={{ traefik_read_timeout }}
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout={{ traefik_read_timeout }}
       - --ping=true
       - --log.level={{ traefik_log_level }}
+{% if traefik_access_log %}
+      - --accesslog=true
+      - --accesslog.filepath=/var/log/traefik/access.log
+{% endif %}
 {% if traefik_acme_email %}
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
@@ -25,9 +33,15 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # 호스트 서비스(traefik_file_routes)용
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
       - letsencrypt:/letsencrypt
+{% if traefik_access_log %}
+      - /var/log/traefik:/var/log/traefik
+{% endif %}
     networks: [{{ traefik_network }}]
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]

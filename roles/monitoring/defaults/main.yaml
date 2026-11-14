@@ -4,7 +4,7 @@ monitoring_dir: /opt/monitoring
 prometheus_port: 9090                # 127.0.0.1 에만
 prometheus_retention: 15d
 prometheus_scrape_interval: 30s
-grafana_port: 3001                   # 127.0.0.1 에만 (nginx 가 프록시). 3000 은 Gitea 와 겹쳐서 3001
+grafana_port: 3001                   # Traefik 네트워크에서만 접근 허용 (ufw). 3000 은 Gitea 와 겹쳐서 3001
 grafana_domain: ""                   # 필수. 예) grafana.example.com
 grafana_root_url: "{{ site_scheme | default('http') }}://{{ grafana_domain }}/"
 grafana_admin_password: ""           # 필수 (vault). 최초 기동 때만 적용

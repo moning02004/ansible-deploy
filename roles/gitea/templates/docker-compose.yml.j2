@@ -47,6 +47,11 @@ services:
       - gitea_data:/data
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
+    networks: [default, {{ traefik_network | default('web') }}]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.gitea.rule: "Host(`{{ gitea_domain }}`)"
+      traefik.http.services.gitea.loadbalancer.server.port: "3000"
     ports:
       - "127.0.0.1:{{ gitea_http_port }}:3000"
       - "{{ gitea_ssh_port }}:22"
@@ -83,6 +88,11 @@ services:
         condition: service_healthy
     logging: *logging
 {% endif %}
+
+networks:
+  default: {}
+  {{ traefik_network | default('web') }}:
+    external: true
 
 volumes:
   db_data:

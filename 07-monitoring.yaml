@@ -1,5 +1,5 @@
 # 07. monitoring — Prometheus + Grafana, 그리고 모든 서버에 node-exporter / cAdvisor
-#   [monitoring] 그룹: Prometheus + Grafana (+ nginx)
+#   [monitoring] 그룹: Prometheus + Grafana (+ Traefik 으로 grafana_domain 노출)
 #   monitoring_targets 그룹 (기본 all): node-exporter(9100), cAdvisor(9280) — 모니터링 서버 IP 에서만 접근 허용
 #
 # 실행:
@@ -21,11 +21,12 @@
   hosts: monitoring
   become: true
   vars:
-    site_scheme: "{{ 'https' if (nginx_certbot_email | default('')) | length > 0 else 'http' }}"
-    nginx_sites:
+    site_scheme: "{{ 'https' if (traefik_acme_email | default('')) | length > 0 else 'http' }}"
+    # Grafana 는 host 네트워크라 Traefik 파일 라우트로 연결
+    traefik_file_routes:
       - name: grafana
-        server_name: "{{ grafana_domain }}"
-        upstream: "http://127.0.0.1:{{ grafana_port | default(3001) }}"
+        host: "{{ grafana_domain }}"
+        url: "http://host.docker.internal:{{ grafana_port | default(3001) }}"
   roles:
-    - { role: nginx,      tags: [nginx] }
+    - { role: traefik,    tags: [traefik] }
     - { role: monitoring, tags: [monitoring] }

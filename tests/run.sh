@@ -3,6 +3,7 @@
 #   tests/run.sh 01-base            실행 → 멱등성(2회차 changed=0) → verify
 #   tests/run.sh 01-base --keep     끝난 뒤 컨테이너 유지 (docker exec -it orca-ansible-test bash)
 #   UBUNTU_VERSION=22.04 tests/run.sh 01-base
+#   NO_CACHE=1 tests/run.sh 01-base             (apt/Docker Hub 캐시 없이)
 #   APT_MIRROR= tests/run.sh 01-base             (테스트 이미지의 apt 미러 변경, 빈 값이면 기본 미러)
 #
 # tests/prepare/<이름>.yaml 이 있으면 플레이북 전에 먼저 실행 (사전 서비스/데이터 준비)
@@ -32,12 +33,32 @@ trap cleanup EXIT
 log "이미지 빌드 ($IMAGE)"
 docker build -q --build-arg UBUNTU_VERSION="$UBUNTU_VERSION" --build-arg APT_MIRROR="${APT_MIRROR-http://ftp.kaist.ac.kr}" -t "$IMAGE" "$ROOT/tests" >/dev/null
 
+# ---- 캐시: 테스트 사이에 .deb 와 Docker Hub 이미지 재사용 (플레이북 동작은 그대로) ----
+CACHE_ARGS=()
+CACHE_VARS="$WORK/cache-vars.yaml"; echo "{}" > "$CACHE_VARS"
+if [[ -z "${NO_CACHE:-}" ]]; then
+  CACHE_ARGS=(-v orca-test-apt-cache:/var/cache/apt/archives)
+  if ! docker inspect -f '{{.State.Running}}' orca-registry-cache 2>/dev/null | grep -q true; then
+    docker rm -f orca-registry-cache >/dev/null 2>&1 || true
+    docker run -d --name orca-registry-cache --restart unless-stopped \
+      -e REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io \
+      -v orca-test-registry-cache:/var/lib/registry registry:2.8.3 >/dev/null
+  fi
+  REG_IP="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' orca-registry-cache)"
+  cat > "$CACHE_VARS" <<VARS
+docker_daemon_options:
+  registry-mirrors: ["http://$REG_IP:5000"]
+  insecure-registries: ["$REG_IP:5000"]
+VARS
+fi
+
 log "테스트 컨테이너 시작"
 docker rm -f -v "$NAME" >/dev/null 2>&1 || true
 # /var/lib/docker, containerd 를 볼륨으로 빼야 컨테이너 안 Docker 가 overlayfs 를 쓸 수 있음
 docker run -d --name "$NAME" --hostname "$NAME" \
   --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
   -v /var/lib/docker -v /var/lib/containerd \
+  ${CACHE_ARGS[@]+"${CACHE_ARGS[@]}"} \
   "$IMAGE" >/dev/null
 for _ in $(seq 30); do
   state="$(docker exec "$NAME" systemctl is-system-running 2>/dev/null || true)"
@@ -49,7 +70,7 @@ done
 rsync -a --exclude .git --exclude 'group_vars/all/vault.yaml' "$ROOT/" "$WORK/"
 cd "$WORK"
 export ANSIBLE_CONFIG="$WORK/ansible.cfg" ANSIBLE_FORCE_COLOR=1
-ARGS=(-i tests/inventory.ini -e @tests/vars.yaml)
+ARGS=(-i tests/inventory.ini -e @tests/vars.yaml -e "@$CACHE_VARS")
 
 if [[ -f "tests/prepare/$PB.yaml" ]]; then
   log "준비: tests/prepare/$PB.yaml"

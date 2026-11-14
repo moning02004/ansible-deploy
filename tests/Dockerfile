@@ -10,6 +10,9 @@ RUN if [ -n "$APT_MIRROR" ]; then \
     fi \
  && apt-get update \
  && apt-get install -y --no-install-recommends systemd systemd-sysv python3 sudo iptables ca-certificates \
- && apt-get clean && rm -rf /var/lib/apt/lists/*
+ && apt-get clean && rm -rf /var/lib/apt/lists/* \
+ # 받은 .deb 를 지우지 않음: 테스트 사이에 apt 캐시 볼륨으로 재사용 (run.sh)
+ && rm -f /etc/apt/apt.conf.d/docker-clean \
+ && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/01keep-debs
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]

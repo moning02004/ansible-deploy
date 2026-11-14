@@ -19,9 +19,20 @@
     name: "{{ common_packages }}"
     state: present
 
-- name: Set timezone
-  community.general.timezone:
-    name: "{{ common_timezone }}"
+# community.general.timezone(hwclock 필요), timedatectl(dbus 필요)은 최소 이미지에서 실패
+# → Debian 표준 방식으로 직접 설정
+- name: Set timezone (/etc/localtime)
+  ansible.builtin.file:
+    src: "/usr/share/zoneinfo/{{ common_timezone }}"
+    dest: /etc/localtime
+    state: link
+    force: true
+
+- name: Set timezone (/etc/timezone)
+  ansible.builtin.copy:
+    dest: /etc/timezone
+    content: "{{ common_timezone }}\n"
+    mode: "0644"
 
 - name: Set hostname
   ansible.builtin.hostname:

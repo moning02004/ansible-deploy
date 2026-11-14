@@ -44,6 +44,19 @@ ansible-playbook -i inventory/all.ini.vault 01-base.yaml --vault-password-file v
 ansible-vault edit group_vars/all/vault.yaml --vault-password-file vault_password.txt
 ```
 
+## 테스트
+로컬 Docker에 systemd가 도는 Ubuntu 컨테이너를 띄워 실제 서버처럼 플레이북을 검증합니다.
+
+```bash
+tests/run.sh 01-base                         # 실행 → 2회차 changed=0(멱등성) → verify
+tests/run.sh 01-base --keep                  # 끝나도 컨테이너 유지: docker exec -it orca-ansible-test bash
+UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
+```
+
+- 점검 항목: `tests/verify/NN-*.yaml`
+- 테스트 변수: `tests/vars.yaml` (vault 대신 사용, 비밀번호 불필요)
+- 플레이북을 추가하면 같은 이름으로 verify 파일도 추가합니다.
+
 ## 01-base 주요 변수
 | 변수 | 기본값 | 설명 |
 |---|---|---|

@@ -1,0 +1,70 @@
+# 01-base 결과 점검
+- name: "verify | 01 base"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Timezone is Asia/Seoul
+      ansible.builtin.command: readlink -f /etc/localtime
+      register: tz
+      changed_when: false
+      failed_when: not tz.stdout.endswith('Asia/Seoul')
+
+    - name: Deploy user is in docker group
+      ansible.builtin.command: "id -nG {{ deploy_user }}"
+      register: groups_out
+      changed_when: false
+      failed_when: "'docker' not in groups_out.stdout.split()"
+
+    - name: SSH key is registered
+      ansible.builtin.command: "cat /home/{{ deploy_user }}/.ssh/authorized_keys"
+      register: keys
+      changed_when: false
+      failed_when: deploy_user_ssh_keys[0] not in keys.stdout
+
+    - name: Passwordless sudo works
+      ansible.builtin.command: sudo -n true
+      become_user: "{{ deploy_user }}"
+      changed_when: false
+
+    - name: ufw is active and allows SSH
+      ansible.builtin.command: ufw status
+      register: ufw
+      changed_when: false
+      failed_when: >-
+        'Status: active' not in ufw.stdout or
+        ufw.stdout is not search('22/tcp\s+ALLOW')
+
+    - name: daemon.json has log rotation
+      ansible.builtin.slurp:
+        src: /etc/docker/daemon.json
+      register: daemon_json
+
+    - name: Check daemon.json values
+      ansible.builtin.assert:
+        that:
+          - cfg['log-driver'] == 'json-file'
+          - cfg['log-opts']['max-size'] == '10m'
+          - cfg['log-opts']['max-file'] == '3'
+        quiet: true
+      vars:
+        cfg: "{{ daemon_json.content | b64decode | from_json }}"
+
+    - name: Deploy user can run containers
+      ansible.builtin.command: docker run --rm hello-world
+      become_user: "{{ deploy_user }}"
+      register: hello
+      changed_when: false
+      failed_when: "'Hello from Docker!' not in hello.stdout"
+
+    - name: docker compose plugin works
+      ansible.builtin.command: docker compose version
+      changed_when: false
+
+    - name: docker rollout is installed
+      ansible.builtin.command: docker rollout --version
+      become_user: "{{ deploy_user }}"
+      register: rollout
+      changed_when: false
+      failed_when: docker_rollout_version | default('v0.14') not in rollout.stdout

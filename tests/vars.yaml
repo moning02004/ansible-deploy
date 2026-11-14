@@ -1,0 +1,4 @@
+# 테스트 전용 변수 (vault 대신 사용)
+deploy_user: manager
+deploy_user_ssh_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl test@orca"

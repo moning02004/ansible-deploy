@@ -1,9 +1,15 @@
 # ---------------- 스케줄 설치 (기본) ----------------
-- name: Install restic
+- name: Remove host restic (runs as a container now)
   ansible.builtin.apt:
     name: restic
-    state: present
-  when: backup_restic_repository | length > 0
+    state: absent
+  tags: [schedule]
+
+- name: Install orca-restic wrapper (restic in a container)
+  ansible.builtin.template:
+    src: orca-restic.sh.j2
+    dest: /usr/local/sbin/orca-restic
+    mode: "0750"
   tags: [schedule]
 
 - name: Create backup directory
@@ -33,7 +39,7 @@
 - name: Initialize restic repository
   ansible.builtin.shell: |
     set -a; . /etc/orca-backup.env; set +a
-    restic cat config >/dev/null 2>&1 && echo exists || restic init
+    /usr/local/sbin/orca-restic cat config >/dev/null 2>&1 && echo exists || /usr/local/sbin/orca-restic init
   register: restic_init
   changed_when: "'created restic repository' in restic_init.stdout"
   when: backup_restic_repository | length > 0

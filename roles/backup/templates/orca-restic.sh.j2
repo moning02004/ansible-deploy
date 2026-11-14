@@ -1,0 +1,13 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# restic 을 컨테이너로 실행합니다. 사용법은 restic 과 같습니다: orca-restic snapshots
+set -eu
+exec docker run --rm -i \
+  --env-file /etc/orca-backup.env \
+  --hostname "{{ inventory_hostname }}" \
+  -v "{{ backup_dir | dirname }}:{{ backup_dir | dirname }}" \
+{% if backup_restic_repository.startswith('/') and not backup_restic_repository.startswith(backup_dir | dirname) %}
+  -v "{{ backup_restic_repository }}:{{ backup_restic_repository }}" \
+{% endif %}
+  -v orca-restic-cache:/root/.cache/restic \
+  {{ backup_restic_image }} "$@"

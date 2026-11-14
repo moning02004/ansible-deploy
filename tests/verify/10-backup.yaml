@@ -47,8 +47,14 @@
       register: bdir
       failed_when: bdir.stat.mode != '0700'
 
+    - name: restic is not installed on the host (container only)
+      ansible.builtin.command: which restic
+      register: hostrestic
+      changed_when: false
+      failed_when: hostrestic.rc == 0
+
     - name: restic snapshot exists
-      ansible.builtin.shell: set -a; . /etc/orca-backup.env; set +a; restic snapshots --json --tag orca
+      ansible.builtin.command: /usr/local/sbin/orca-restic snapshots --json --tag orca
       register: snaps
       changed_when: false
       failed_when: (snaps.stdout | from_json | length) < 1

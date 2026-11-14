@@ -74,8 +74,8 @@ find "$BASE" -mindepth 1 -maxdepth 1 -type d -mtime +{{ backup_keep_days }} -pri
 
 {% if backup_restic_repository %}
 log "restic: backup → {{ backup_restic_repository }}"
-restic backup "$OUT" --tag orca --host "{{ inventory_hostname }}" --quiet
-restic forget --tag orca --host "{{ inventory_hostname }}" {{ backup_restic_forget }} --prune --quiet
+/usr/local/sbin/orca-restic backup "$OUT" --tag orca --host "{{ inventory_hostname }}" --quiet
+/usr/local/sbin/orca-restic forget --tag orca --host "{{ inventory_hostname }}" {{ backup_restic_forget }} --prune --quiet
 {% endif %}
 
 log "done: $OUT ($(du -sh "$OUT" | cut -f1))"

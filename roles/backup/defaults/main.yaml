@@ -8,6 +8,7 @@ backup_include_configs: true               # /opt/*/docker-compose.yml, .env 등
 backup_restic_repository: ""
 backup_restic_password: ""                 # vault. 잃으면 restic 백업을 풀 수 없음
 backup_restic_env: {}                      # 예) { AWS_ACCESS_KEY_ID: ..., AWS_SECRET_ACCESS_KEY: ... }
+backup_restic_image: "restic/restic:0.19.1"   # 호스트에 설치하지 않고 컨테이너로 실행 (orca-restic)
 backup_restic_forget: "--keep-daily 7 --keep-weekly 4 --keep-monthly 6"
 
 # --tags now 일 때 컨트롤러로 가져오기

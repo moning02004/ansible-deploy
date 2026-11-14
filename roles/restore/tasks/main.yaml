@@ -29,9 +29,8 @@
     - name: restic restore
       ansible.builtin.shell: |
         set -euo pipefail
-        set -a; . /etc/orca-backup.env; set +a
         rm -rf {{ backup_dir }}/restic-restore
-        restic restore {{ restore_restic_snapshot }} --host {{ inventory_hostname }} --tag orca --target {{ backup_dir }}/restic-restore --quiet
+        /usr/local/sbin/orca-restic restore {{ restore_restic_snapshot }} --host {{ inventory_hostname }} --tag orca --target {{ backup_dir }}/restic-restore --quiet
         dirname "$(find {{ backup_dir }}/restic-restore -name MANIFEST | head -1)"
       args:
         executable: /bin/bash

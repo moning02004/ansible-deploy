@@ -64,7 +64,20 @@
       ansible.builtin.shell: |
         systemctl restart docker
         sleep 5
-        iptables -S DOCKER-USER
+        iptables -S DOCKER-USER; iptables -S ORCA-DOCKER
       register: chain
       changed_when: false
-      failed_when: "'--ctorigdstport 5432' not in chain.stdout or '-j DROP' not in chain.stdout"
+      failed_when: >-
+        '-A DOCKER-USER -j ORCA-DOCKER' not in chain.stdout or
+        '--ctorigdstport 5432' not in chain.stdout or '-j DROP' not in chain.stdout
+
+    - name: Other tools' rules in DOCKER-USER survive a re-apply
+      ansible.builtin.shell: |
+        iptables -N VERIFY-OTHER 2>/dev/null || true
+        iptables -I DOCKER-USER -j VERIFY-OTHER
+        /usr/local/sbin/docker-firewall
+        iptables -S DOCKER-USER
+        iptables -D DOCKER-USER -j VERIFY-OTHER; iptables -X VERIFY-OTHER
+      register: other
+      changed_when: false
+      failed_when: "'-j VERIFY-OTHER' not in other.stdout"

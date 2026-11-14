@@ -165,9 +165,9 @@ networks:
 - `postgres_settings` 로 `max_connections`, `shared_buffers` 등 설정
 
 ### Docker 포트 방화벽 (docker_firewall)
-Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 06/09 는 `DOCKER-USER` 체인에 출발지 제한 규칙을 넣고, `docker-firewall.service` 가 Docker 재시작/재부팅 때마다 다시 적용합니다.
+Docker 로 publish 한 포트는 ufw 를 거치지 않습니다. 06/09 는 전용 `ORCA-DOCKER` 체인(DOCKER-USER 에서 연결)에 출발지 제한 규칙을 넣고, `docker-firewall.service` 가 Docker 재시작/재부팅 때마다 다시 적용합니다.
 - 규칙 파일: `/etc/docker-firewall/rules.d/*.rules` (`<포트> <프로토콜> <허용 CIDR...>`)
-- 확인: `sudo iptables -S DOCKER-USER`
+- 확인: `sudo iptables -S ORCA-DOCKER`
 
 ## 07-monitoring
 | 대상 | 구성 |

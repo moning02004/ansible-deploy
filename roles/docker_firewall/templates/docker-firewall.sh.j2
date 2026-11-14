@@ -1,13 +1,20 @@
 #!/bin/sh
 # {{ ansible_managed }}
-# /etc/docker-firewall/rules.d/*.rules 를 읽어 DOCKER-USER 체인을 다시 만듭니다.
+# /etc/docker-firewall/rules.d/*.rules 를 읽어 전용 체인 ORCA-DOCKER 를 다시 만들고
+# DOCKER-USER 에서는 그 체인으로 넘기는 규칙 하나만 관리합니다.
+# (DOCKER-USER 를 통째로 비우면 CrowdSec 차단기 등 다른 도구의 규칙까지 지워지므로)
 #   형식: <port> <proto> [허용 CIDR ...]   (CIDR 이 없으면 외부 접근 전부 차단)
 set -eu
 IF="{{ docker_firewall_interface }}"
 
+CHAIN=ORCA-DOCKER
 iptables -N DOCKER-USER 2>/dev/null || true
-iptables -F DOCKER-USER
-iptables -A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
+iptables -N "$CHAIN" 2>/dev/null || true
+iptables -F "$CHAIN"
+iptables -C DOCKER-USER -j "$CHAIN" 2>/dev/null || iptables -I DOCKER-USER 1 -j "$CHAIN"
+# 예전 버전이 DOCKER-USER 에 직접 넣던 규칙 정리
+iptables -S DOCKER-USER | grep -- '--ctorigdstport' | sed 's/^-A /-D /' | while read -r rule; do iptables $rule; done || true
+iptables -A "$CHAIN" -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
 
 # 1) 모든 파일의 허용 규칙을 먼저, 2) 포트별 차단 규칙은 맨 뒤에 한 번씩
 #    (파일마다 DROP 을 붙이면 같은 포트를 다루는 다음 파일의 허용이 막힘)
@@ -16,12 +23,12 @@ RULES="$(cat /etc/docker-firewall/rules.d/*.rules 2>/dev/null | grep -vE '^\s*(#
 echo "$RULES" | while read -r port proto sources; do
   [ -n "$port" ] || continue
   for src in $sources; do
-    iptables -A DOCKER-USER -i "$IF" -p "$proto" -m conntrack --ctorigdstport "$port" --ctdir ORIGINAL -s "$src" -j RETURN
+    iptables -A "$CHAIN" -i "$IF" -p "$proto" -m conntrack --ctorigdstport "$port" --ctdir ORIGINAL -s "$src" -j RETURN
   done
 done
 
 echo "$RULES" | awk 'NF {print $1, $2}' | sort -u | while read -r port proto; do
-  iptables -A DOCKER-USER -i "$IF" -p "$proto" -m conntrack --ctorigdstport "$port" --ctdir ORIGINAL -j DROP
+  iptables -A "$CHAIN" -i "$IF" -p "$proto" -m conntrack --ctorigdstport "$port" --ctdir ORIGINAL -j DROP
 done
 
-iptables -A DOCKER-USER -j RETURN
+iptables -A "$CHAIN" -j RETURN

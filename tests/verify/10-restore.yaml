@@ -1,0 +1,63 @@
+# test: skip-idempotency  (복구는 실행할 때마다 데이터를 덮어씀)
+# 10-restore 결과 점검: 백업 시점(v1) 데이터가 돌아왔는지
+- name: "verify | 10 restore"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: postgres data is back to v1
+      ansible.builtin.command: docker exec postgres psql -U postgres -d appdb -tAc "SELECT v FROM marker"
+      register: pg
+      changed_when: false
+      failed_when: pg.stdout != 'marker-v1'
+
+    - name: app user still logs in after restore
+      ansible.builtin.command:
+        argv: [docker, exec, -e, "PGPASSWORD={{ postgres_databases[0].password }}", postgres,
+               psql, -h, 127.0.0.1, -U, appuser, -d, appdb, -tAc, "SELECT count(*) FROM marker"]
+      changed_when: false
+
+    - name: redis data is back to v1
+      ansible.builtin.command: docker exec redis redis-cli get marker
+      register: rd
+      changed_when: false
+      failed_when: rd.stdout != 'v1'
+
+    - name: rabbitmq queue is back
+      ansible.builtin.uri:
+        url: http://127.0.0.1:15672/api/queues/%2F/orders
+        user: "{{ rabbitmq_user }}"
+        password: "{{ rabbitmq_password }}"
+        force_basic_auth: true
+
+    - name: gitea repo and its README are back
+      ansible.builtin.uri:
+        url: http://127.0.0.1/api/v1/repos/gitea_admin/restore-check/contents/README.md
+        headers: { Host: "{{ gitea_domain }}" }
+        user: gitea_admin
+        password: "{{ gitea_admin_password }}"
+        force_basic_auth: true
+      register: repo
+      until: repo.status == 200
+      retries: 10
+      delay: 3
+
+    - name: wharfline marker table is back and app is up
+      ansible.builtin.shell: |
+        docker exec wharfline-db-1 psql -U wharfline -d wharfline -tAc "SELECT v FROM orca_restore_marker"
+        curl -s -o /dev/null -w '%{http_code}' -H 'Host: {{ wharfline_domain }}' http://127.0.0.1/
+      register: wf
+      changed_when: false
+      failed_when: wf.stdout_lines != ['v1', '200']
+
+    - name: Refuses to run without confirmation
+      ansible.builtin.command: >-
+        ansible-playbook -i tests/inventory.ini -e @tests/vars.yaml -e restore_confirm=no 10-restore.yaml
+      delegate_to: localhost
+      args:
+        chdir: "{{ playbook_dir }}/../.."   # 저장소 루트
+      become: false
+      register: noconfirm
+      changed_when: false
+      failed_when: noconfirm.rc == 0 or 'restore_confirm=yes' not in noconfirm.stdout

@@ -1,0 +1,48 @@
+# AOF 가 켜진 Redis 는 AOF 파일이 없으면 RDB 를 읽지 않고 빈 상태로 시작합니다.
+# → AOF 를 끈 임시 컨테이너로 RDB 를 읽고, CONFIG SET appendonly yes 로 AOF 를 새로 만든 뒤 원래대로 띄웁니다.
+- name: "redis | find image and password"
+  ansible.builtin.shell: |
+    docker inspect -f '{{ '{{' }}.Config.Image{{ '}}' }}' redis
+  register: redis_image
+  changed_when: false
+
+- name: "redis | stop"
+  ansible.builtin.command: docker compose stop redis
+  args: { chdir: /opt/middleware }
+
+- name: "redis | replace data with backup"
+  ansible.builtin.command: >-
+    docker run --rm -v middleware_redis_data:/data -v "{{ src }}":/b:ro busybox:1.37
+    sh -c "rm -rf /data/appendonlydir /data/dump.rdb && cp /b/redis-dump.rdb /data/dump.rdb && chown 999:999 /data/dump.rdb"
+
+- name: "redis | load RDB and rebuild AOF in a temporary container"
+  ansible.builtin.shell: |
+    set -eu
+    docker rm -f redis-restore >/dev/null 2>&1 || true
+    docker run -d --name redis-restore -v middleware_redis_data:/data {{ redis_image.stdout }} redis-server --appendonly no >/dev/null
+    for i in $(seq 60); do
+      docker exec redis-restore redis-cli ping 2>/dev/null | grep -q PONG && \
+      docker exec redis-restore redis-cli info persistence | grep -q 'loading:0' && break
+      sleep 1
+    done
+    docker exec redis-restore redis-cli config set appendonly yes >/dev/null
+    for i in $(seq 120); do
+      docker exec redis-restore redis-cli info persistence | grep -q 'aof_rewrite_in_progress:0' && \
+      docker exec redis-restore redis-cli info persistence | grep -q 'aof_rewrite_scheduled:0' && \
+      docker exec redis-restore sh -c 'ls /data/appendonlydir/*.manifest' >/dev/null 2>&1 && break
+      sleep 1
+    done
+    docker exec redis-restore redis-cli dbsize
+    docker exec redis-restore redis-cli shutdown >/dev/null 2>&1 || true
+    docker rm -f redis-restore >/dev/null 2>&1 || true
+  args:
+    executable: /bin/bash
+  register: redis_load
+
+- name: "redis | keys loaded"
+  ansible.builtin.debug:
+    msg: "keys: {{ redis_load.stdout_lines | last }}"
+
+- name: "redis | start"
+  ansible.builtin.command: docker compose up -d --wait redis
+  args: { chdir: /opt/middleware }

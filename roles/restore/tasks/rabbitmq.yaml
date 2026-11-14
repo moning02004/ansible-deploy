@@ -1,0 +1,5 @@
+- name: "rabbitmq | import definitions"
+  ansible.builtin.shell: |
+    docker cp "{{ src }}/rabbitmq-definitions.json" rabbitmq:/tmp/definitions.json
+    docker exec rabbitmq rabbitmqctl -q import_definitions /tmp/definitions.json
+    docker exec rabbitmq rm -f /tmp/definitions.json

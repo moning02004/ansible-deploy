@@ -1,0 +1,18 @@
+# 마스터 키(wharfline_master_key)가 백업 당시와 같아야 비밀 값을 읽을 수 있습니다
+- name: "wharfline | stop app"
+  ansible.builtin.command: docker compose stop backend frontend
+  args: { chdir: /opt/wharfline }
+
+- name: "wharfline | restore database"
+  ansible.builtin.shell: >-
+    docker exec -i wharfline-db-1 pg_restore -U wharfline -d wharfline --clean --if-exists --no-owner
+    < "{{ src }}/wharfline-db.dump"
+
+# 느린 서버(에뮬레이션 등)에선 backend 가 healthcheck 허용 시간을 넘길 수 있음 → 재시도
+- name: "wharfline | start"
+  ansible.builtin.command: docker compose up -d --wait
+  args: { chdir: /opt/wharfline }
+  register: wf_start
+  until: wf_start.rc == 0
+  retries: 5
+  delay: 15

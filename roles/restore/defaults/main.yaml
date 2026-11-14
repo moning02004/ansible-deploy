@@ -1,0 +1,14 @@
+restore_components: []        # [postgres, gitea, wharfline, gitlab, rabbitmq, redis]
+restore_confirm: ""           # "yes" 여야 실행
+restore_from: latest
+restore_upload_dir: ""
+restore_restic_snapshot: ""
+backup_dir: /var/backups/orca
+restore_known_components: [postgres, gitea, wharfline, gitlab, rabbitmq, redis]
+restore_required_files:
+  postgres:  [postgres-all.sql.gz]
+  gitea:     [gitea-db.dump, gitea-data.tar.gz]
+  wharfline: [wharfline-db.dump]
+  gitlab:    [gitlab_backup.tar, gitlab-config.tar.gz]
+  rabbitmq:  [rabbitmq-definitions.json]
+  redis:     [redis-dump.rdb]

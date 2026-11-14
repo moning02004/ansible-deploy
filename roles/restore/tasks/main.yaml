@@ -1,0 +1,71 @@
+- name: Confirm restore
+  ansible.builtin.assert:
+    that:
+      - restore_confirm == 'yes'
+      - restore_components | length > 0
+      - restore_components | difference(restore_known_components) | length == 0
+    fail_msg: >-
+      복구는 데이터를 덮어씁니다. -e restore_confirm=yes 와
+      restore_components ({{ restore_known_components | join(', ') }}) 를 지정하세요.
+    quiet: true
+
+# ---------- 복구 원본 정하기 ----------
+- name: Upload backup from controller
+  when: restore_upload_dir | length > 0
+  block:
+    - name: Copy backup directory to server
+      ansible.builtin.copy:
+        src: "{{ restore_upload_dir }}/"
+        dest: "{{ backup_dir }}/uploaded/"
+        mode: "0600"
+        directory_mode: "0700"
+    - name: Use uploaded backup
+      ansible.builtin.set_fact:
+        restore_src: "{{ backup_dir }}/uploaded"
+
+- name: Restore from restic snapshot
+  when: restore_restic_snapshot | length > 0 and restore_upload_dir | length == 0
+  block:
+    - name: restic restore
+      ansible.builtin.shell: |
+        set -euo pipefail
+        set -a; . /etc/orca-backup.env; set +a
+        rm -rf {{ backup_dir }}/restic-restore
+        restic restore {{ restore_restic_snapshot }} --host {{ inventory_hostname }} --tag orca --target {{ backup_dir }}/restic-restore --quiet
+        dirname "$(find {{ backup_dir }}/restic-restore -name MANIFEST | head -1)"
+      args:
+        executable: /bin/bash
+      register: restic_out
+    - name: Use restic backup
+      ansible.builtin.set_fact:
+        restore_src: "{{ restic_out.stdout_lines | last }}"
+
+- name: Use backup on server
+  ansible.builtin.set_fact:
+    restore_src: "{{ backup_dir }}/{{ restore_from }}"
+  when: restore_src is not defined
+
+- name: Resolve backup path
+  ansible.builtin.command: realpath "{{ restore_src }}"
+  register: restore_real
+  changed_when: false
+
+- name: Check backup files exist
+  ansible.builtin.stat:
+    path: "{{ restore_real.stdout }}/{{ item }}"
+  loop: "{{ restore_components | map('extract', restore_required_files) | flatten }}"
+  register: restore_files
+  failed_when: not restore_files.stat.exists
+
+- name: Restoring from
+  ansible.builtin.debug:
+    msg: "{{ restore_real.stdout }} → {{ restore_components | join(', ') }}"
+
+# ---------- 구성 요소별 복구 ----------
+- name: Restore components
+  ansible.builtin.include_tasks: "{{ component }}.yaml"
+  loop: "{{ restore_known_components | select('in', restore_components) | list }}"
+  loop_control:
+    loop_var: component
+  vars:
+    src: "{{ restore_real.stdout }}"

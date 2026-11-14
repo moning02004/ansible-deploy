@@ -1,0 +1,44 @@
+# 버전 (https://kubernetes.io/releases/ — pkgs.k8s.io 저장소는 마이너 버전별)
+k8s_version: "1.37.2"
+k8s_minor: "{{ k8s_version.split('.')[:2] | join('.') }}"
+k8s_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(ansible_architecture, ansible_architecture) }}"
+k8s_flannel_version: "v0.28.10"          # https://github.com/flannel-io/flannel/releases
+k8s_helm_version: "v4.3.2"               # https://github.com/helm/helm/releases
+k8s_metrics_server_version: "v0.9.1"     # https://github.com/kubernetes-sigs/metrics-server/releases
+k8s_local_path_version: "v0.0.37"        # https://github.com/rancher/local-path-provisioner/releases
+k8s_traefik_chart_version: "42.4.0"      # https://github.com/traefik/traefik-helm-chart/releases
+
+# 클러스터 (단일 노드 control-plane)
+k8s_cluster_name: kubernetes
+k8s_advertise_address: "{{ ansible_default_ipv4.address }}"
+k8s_control_plane_endpoint: "{{ k8s_advertise_address }}:6443"
+k8s_api_cert_sans: []                    # kubectl 로 접속할 도메인/IP 추가. 예) [k8s.example.com]
+k8s_pod_subnet: 10.244.0.0/16            # Flannel 기본값. Docker 대역(172.17~31, 192.168)과 겹치지 않게
+k8s_service_subnet: 10.96.0.0/12
+k8s_control_plane_schedulable: true      # 단일 노드라 control-plane 에도 일반 Pod 배치
+
+# 호스트 준비
+k8s_disable_swap: true                   # false 면 swap 을 둔 채 kubelet failSwapOn=false (NoSwap)
+k8s_load_kernel_modules: true            # overlay, br_netfilter
+k8s_preflight_ignore_errors: []          # kubeadm init --ignore-preflight-errors
+k8s_kube_proxy_conntrack_max_per_core: null   # 0 이면 kube-proxy 가 nf_conntrack_max 를 건드리지 않음 (컨테이너 안 노드용)
+
+# 방화벽: 6443(API) 을 열어 줄 출발지 CIDR. 비우면 서버 안에서만 kubectl 사용
+k8s_api_allowed_sources: []
+
+# 애드온
+k8s_metrics_server_enabled: true         # kubectl top, HPA
+k8s_local_path_enabled: true             # 기본 StorageClass (PVC → 노드 로컬 디렉터리)
+k8s_local_path_dir: /opt/local-path-provisioner
+k8s_ingress_enabled: true                # Traefik ingress (기본 IngressClass), hostPort 로 80/443 수신
+k8s_ingress_http_port: 80
+k8s_ingress_https_port: 443
+
+# etcd 스냅샷 (매일, systemd timer)
+k8s_etcd_backup_enabled: true
+k8s_etcd_backup_dir: /var/backups/etcd
+k8s_etcd_backup_keep: 7                  # 보관 개수
+k8s_etcd_backup_on_calendar: "*-*-* 03:30:00"
+
+k8s_users:                               # ~/.kube/config 를 받을 사용자
+  - "{{ deploy_user }}"

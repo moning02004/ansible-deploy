@@ -1,0 +1,26 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# etcd 스냅샷 + PKI 를 {{ k8s_etcd_backup_dir }} 에 저장 (최근 {{ k8s_etcd_backup_keep }}개 보관)
+#   etcd static Pod 컨테이너 안의 etcdctl 로 /var/lib/etcd(hostPath) 에 저장한 뒤 옮김
+#   복구: https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster
+set -eu
+DIR="{{ k8s_etcd_backup_dir }}"
+TS="$(date +%Y%m%d-%H%M%S)"
+CID="$(crictl ps --name '^etcd$' --state running -q | head -1)"
+[ -n "$CID" ] || { echo "etcd 컨테이너를 찾지 못했습니다" >&2; exit 1; }
+
+crictl exec "$CID" etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  snapshot save "/var/lib/etcd/snapshot-$TS.db"
+
+mv "/var/lib/etcd/snapshot-$TS.db" "$DIR/etcd-$TS.db"
+tar -czf "$DIR/pki-$TS.tar.gz" -C /etc/kubernetes pki
+chmod 600 "$DIR/etcd-$TS.db" "$DIR/pki-$TS.tar.gz"
+
+# 오래된 것 정리
+ls -1t "$DIR"/etcd-*.db 2>/dev/null | tail -n +$(({{ k8s_etcd_backup_keep }} + 1)) | xargs -r rm -f
+ls -1t "$DIR"/pki-*.tar.gz 2>/dev/null | tail -n +$(({{ k8s_etcd_backup_keep }} + 1)) | xargs -r rm -f
+echo "etcd snapshot: $DIR/etcd-$TS.db"

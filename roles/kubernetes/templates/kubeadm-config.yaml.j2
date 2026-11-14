@@ -1,0 +1,41 @@
+# {{ ansible_managed }}
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "{{ k8s_advertise_address }}"
+  bindPort: 6443
+nodeRegistration:
+  criSocket: unix:///run/containerd/containerd.sock
+  name: "{{ ansible_hostname }}"
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+clusterName: "{{ k8s_cluster_name }}"
+kubernetesVersion: "v{{ k8s_version }}"
+controlPlaneEndpoint: "{{ k8s_control_plane_endpoint }}"
+networking:
+  podSubnet: "{{ k8s_pod_subnet }}"
+  serviceSubnet: "{{ k8s_service_subnet }}"
+{% if k8s_api_cert_sans %}
+apiServer:
+  certSANs:
+{% for san in k8s_api_cert_sans %}
+    - "{{ san }}"
+{% endfor %}
+{% endif %}
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: systemd
+{% if not k8s_disable_swap | bool %}
+failSwapOn: false
+memorySwap:
+  swapBehavior: NoSwap
+{% endif %}
+{% if k8s_kube_proxy_conntrack_max_per_core is not none %}
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+conntrack:
+  maxPerCore: {{ k8s_kube_proxy_conntrack_max_per_core }}
+{% endif %}

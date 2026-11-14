@@ -1,0 +1,17 @@
+- name: "gitea | stop gitea and runner"
+  ansible.builtin.command: docker compose stop gitea runner
+  args: { chdir: /opt/gitea }
+
+- name: "gitea | restore database"
+  ansible.builtin.shell: >-
+    docker exec -i gitea-db pg_restore -U gitea -d gitea --clean --if-exists --no-owner
+    < "{{ src }}/gitea-db.dump"
+
+- name: "gitea | restore data volume"
+  ansible.builtin.command: >-
+    docker run --rm -v gitea_gitea_data:/v -v "{{ src }}":/b:ro busybox:1.37
+    sh -c "find /v -mindepth 1 -delete && tar xzf /b/gitea-data.tar.gz -C /v"
+
+- name: "gitea | start"
+  ansible.builtin.command: docker compose up -d --wait
+  args: { chdir: /opt/gitea }

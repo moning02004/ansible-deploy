@@ -1,0 +1,16 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that:
+      - k8s_version is match('^\d+\.\d+\.\d+$')
+      - k8s_advertise_address | length > 0
+    fail_msg: "k8s_version 은 1.37.2 형식, k8s_advertise_address 는 비울 수 없습니다"
+    quiet: true
+
+- { name: Host preparation (swap / kernel),  ansible.builtin.import_tasks: host.yaml,       tags: [k8s-host] }
+- { name: containerd CRI (Docker 와 공유),   ansible.builtin.import_tasks: containerd.yaml, tags: [k8s-containerd] }
+- { name: kubeadm / kubelet / kubectl,       ansible.builtin.import_tasks: packages.yaml,   tags: [k8s-packages] }
+- { name: Firewall,                          ansible.builtin.import_tasks: firewall.yaml,   tags: [k8s-firewall] }
+- { name: Cluster init,                      ansible.builtin.import_tasks: cluster.yaml,    tags: [k8s-cluster] }
+- { name: Helm,                              ansible.builtin.import_tasks: helm.yaml,       tags: [k8s-helm] }
+- { name: Addons,                            ansible.builtin.import_tasks: addons.yaml,     tags: [k8s-addons] }
+- { name: etcd backup,                       ansible.builtin.import_tasks: etcd_backup.yaml, tags: [k8s-backup], when: k8s_etcd_backup_enabled | bool }

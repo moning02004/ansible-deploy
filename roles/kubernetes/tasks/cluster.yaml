@@ -1,0 +1,84 @@
+- name: Check existing cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_admin_conf
+
+- name: Write kubeadm config
+  ansible.builtin.template:
+    src: kubeadm-config.yaml.j2
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    mode: "0600"
+
+- name: Validate kubeadm config
+  ansible.builtin.command: kubeadm config validate --config /etc/kubernetes/kubeadm-config.yaml
+  changed_when: false
+
+- name: Initialize cluster (kubeadm init)
+  when: not k8s_admin_conf.stat.exists
+  block:
+    - name: Pull control-plane images
+      ansible.builtin.command: kubeadm config images pull --config /etc/kubernetes/kubeadm-config.yaml
+      changed_when: true
+
+    - name: kubeadm init
+      ansible.builtin.command: >-
+        kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+        {% if k8s_preflight_ignore_errors %}--ignore-preflight-errors={{ k8s_preflight_ignore_errors | join(',') }}{% endif %}
+      changed_when: true
+
+- name: Create /root/.kube
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    mode: "0700"
+
+- name: Install kubeconfig for root
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+    mode: "0600"
+
+- name: Create .kube for users
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.kube"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ k8s_users }}"
+
+- name: Install kubeconfig for users
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ item }}/.kube/config"
+    remote_src: true
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ k8s_users }}"
+
+- name: Wait for API server
+  ansible.builtin.command: kubectl get --raw /readyz
+  register: k8s_readyz
+  until: k8s_readyz.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false
+
+- name: Allow workloads on control-plane (single node)
+  ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule-
+  register: k8s_untaint
+  changed_when: "'untainted' in k8s_untaint.stdout"
+  failed_when: k8s_untaint.rc != 0 and 'not found' not in k8s_untaint.stderr
+  when: k8s_control_plane_schedulable | bool
+
+- name: kubectl / kubeadm bash completion and alias k
+  ansible.builtin.shell: |
+    set -e
+    tmp=$(mktemp)
+    { kubectl completion bash; kubeadm completion bash; echo 'alias k=kubectl'; echo 'complete -o default -F __start_kubectl k'; } > "$tmp"
+    if cmp -s "$tmp" /etc/bash_completion.d/kubernetes; then rm -f "$tmp"; echo unchanged
+    else install -m 0644 "$tmp" /etc/bash_completion.d/kubernetes; rm -f "$tmp"; echo changed; fi
+  register: k8s_completion
+  changed_when: k8s_completion.stdout == 'changed'

@@ -51,3 +51,9 @@ backup_restic_password: test-restic-pw
 # 10 restore (테스트에서만 확인 생략)
 restore_confirm: "yes"
 restore_components: [postgres, gitea, wharfline, rabbitmq, redis]
+
+# 11 kubernetes (테스트 컨테이너는 Docker Desktop VM 커널을 공유)
+k8s_disable_swap: false                   # VM 의 swap 을 끄지 않음 → kubelet failSwapOn=false
+k8s_load_kernel_modules: false            # 컨테이너엔 /lib/modules 가 없음 (overlay, br_netfilter 는 VM 커널에 내장)
+k8s_preflight_ignore_errors: [SystemVerification]   # 커널 설정 파일(/proc/config.gz) 없음
+k8s_kube_proxy_conntrack_max_per_core: 0  # 중첩 컨테이너에선 nf_conntrack_max 를 못 바꿈 (kind 와 같은 설정)

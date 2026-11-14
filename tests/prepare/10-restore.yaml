@@ -1,0 +1,55 @@
+# 서비스 설치 → 표시 데이터(v1) → 백업 → 데이터 망가뜨리기(v2) 까지 준비. 이후 10-restore 로 v1 이 돌아와야 함
+- import_playbook: ../../02-gitea.yaml
+- import_playbook: ../../05-postgres.yaml
+- import_playbook: ../../08-middleware.yaml
+- import_playbook: ../../09-backup.yaml
+- import_playbook: seed.yaml
+
+- name: "prepare | gitea + wharfline marker, backup, then break data"
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    gitea_api: &gitea_api
+      headers: { Host: "{{ gitea_domain }}" }
+      user: gitea_admin
+      password: "{{ gitea_admin_password }}"
+      force_basic_auth: true
+  tasks:
+    - name: gitea repo with README
+      ansible.builtin.uri:
+        url: http://127.0.0.1/api/v1/user/repos
+        method: POST
+        body_format: json
+        body: { name: restore-check, auto_init: true }
+        status_code: [201, 409]
+        <<: *gitea_api
+
+    - name: wharfline marker table
+      ansible.builtin.command: >-
+        docker exec wharfline-db-1 psql -U wharfline -d wharfline -c
+        "CREATE TABLE IF NOT EXISTS orca_restore_marker(v text); INSERT INTO orca_restore_marker VALUES ('v1')"
+
+    - name: Backup now
+      ansible.builtin.command: /usr/local/sbin/orca-backup
+
+    - name: Break postgres
+      ansible.builtin.command: docker exec postgres psql -U postgres -d appdb -c "UPDATE marker SET v = 'marker-v2'"
+    - name: Break redis
+      ansible.builtin.command: docker exec redis redis-cli set marker v2
+    - name: Break rabbitmq
+      ansible.builtin.uri:
+        url: http://127.0.0.1:15672/api/queues/%2F/orders
+        method: DELETE
+        user: "{{ rabbitmq_user }}"
+        password: "{{ rabbitmq_password }}"
+        force_basic_auth: true
+        status_code: 204
+    - name: Break gitea (delete repo)
+      ansible.builtin.uri:
+        url: http://127.0.0.1/api/v1/repos/gitea_admin/restore-check
+        method: DELETE
+        status_code: 204
+        <<: *gitea_api
+    - name: Break wharfline
+      ansible.builtin.command: docker exec wharfline-db-1 psql -U wharfline -d wharfline -c "DROP TABLE orca_restore_marker"

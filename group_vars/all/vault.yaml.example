@@ -1,5 +1,6 @@
 # group_vars/all/vault.yaml 의 평문 예시 (실제 파일은 ansible-vault로 암호화)
 #   편집: ansible-vault edit group_vars/all/vault.yaml --vault-password-file vault_password.txt
+#   비밀번호 생성: openssl rand -base64 24
 
 # ---------- 01 base ----------
 deploy_user: manager
@@ -7,20 +8,62 @@ deploy_user_ssh_keys:
   - "ssh-ed25519 AAAA... me@laptop"
 # common_apt_upgrade: true
 # firewall_allowed_tcp_ports: [80, 443]
+# firewall_rules:
+#   - { port: 22, from: 203.0.113.0/24 }
 
-# ---------- 02 gitea ----------
-# nginx_certbot_email: you@example.com     # 지정하면 HTTPS (Let's Encrypt)
-gitea_domain: git.example.com
-gitea_db_password: "openssl rand -base64 32 로 생성"
-gitea_admin_email: you@example.com
-gitea_admin_password: "8자 이상"
+# ---------- 02 gitea / 03 gitlab 공통 ----------
+# nginx_certbot_email: you@example.com     # 지정하면 HTTPS (Let's Encrypt). DNS 가 서버를 가리켜야 함
 wharfline_domain: deploy.example.com
-wharfline_postgres_password: "openssl rand -base64 32 로 생성"
+wharfline_postgres_password: "<random>"
 wharfline_owner_email: you@example.com
-wharfline_owner_password: "10자 이상, 첫 로그인 때 변경"
+wharfline_owner_password: "<10자 이상, 첫 로그인 때 변경>"
 # wharfline_master_key: "k20261114...:base64..."   # 첫 실행 후 secrets/<호스트>/ 에 생긴 키를 여기로 옮기기
 # wharfline_platform: linux/amd64                   # ARM 서버일 때만
 
+# ---------- 02 gitea ----------
+gitea_domain: git.example.com
+gitea_db_password: "<random>"
+gitea_admin_email: you@example.com
+gitea_admin_password: "<8자 이상>"
+
+# ---------- 03 gitlab ----------
+gitlab_domain: gitlab.example.com
+gitlab_root_password: "<무작위 문자열. 흔한 단어 조합이면 GitLab 이 거부>"
+# gitlab_low_memory: false                # 8GB 이상 서버
+
+# ---------- 04 app ----------
+# traefik_acme_email: you@example.com     # 지정하면 Let's Encrypt
+# app_registries:
+#   - { registry: ghcr.io, username: me, password: "<read:packages 토큰>" }
+
+# ---------- 05 postgres ----------
+postgres_superuser_password: "<random>"
+postgres_allowed_sources: []               # 예) [10.0.0.0/24]  비우면 서버 내부에서만
+postgres_databases: []
+#   - { name: app, user: app, password: "<random>" }
+
+# ---------- 06 monitoring ----------
+grafana_domain: grafana.example.com
+grafana_admin_password: "<8자 이상>"
+
+# ---------- 07 security ----------
+# security_disable_password_auth: true    # 인벤토리를 키 접속으로 바꾼 뒤에
+# security_fail2ban_ignoreip: [203.0.113.10]
+# security_auto_reboot: true
+
 # ---------- 08 middleware ----------
-rabbitmq_user: "admin"
-rabbitmq_password: "password!2"
+rabbitmq_user: admin
+rabbitmq_password: "<random>"
+redis_password: "<random>"
+middleware_allowed_sources: []             # 예) [10.0.0.0/24]
+
+# ---------- 09 backup ----------
+# backup_keep_days: 7
+# backup_restic_repository: "s3:https://kr.object.ncloudstorage.com/my-bucket/orca"
+# backup_restic_password: "<random. 잃으면 복구 불가>"
+# backup_restic_env: { AWS_ACCESS_KEY_ID: "...", AWS_SECRET_ACCESS_KEY: "..." }
+
+# ---------- 11 kubernetes (필수 값 없음, 원격 kubectl 쓸 때만) ----------
+# k8s_api_allowed_sources: [203.0.113.0/24]   # 6443 을 열 출발지
+# k8s_api_cert_sans: [k8s.example.com]        # API 인증서에 넣을 도메인/IP
+# k8s_ingress_enabled: false                  # 80/443 을 다른 서비스가 쓰면

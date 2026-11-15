@@ -8,7 +8,7 @@ postgres_allowed_sources: []
 # 만들 DB/유저 (유저는 해당 DB 의 owner)
 #   - { name: app, user: app, password: "{{ vault_app_db_password }}" }
 postgres_databases: []
-# postgres -c 옵션
+# postgres -c 옵션. 통째로 바뀜. 서버 사양별 값: https://pgtune.leopard.in.ua/ (docs/variables.md)
 postgres_settings:
   max_connections: 200
   shared_buffers: 256MB

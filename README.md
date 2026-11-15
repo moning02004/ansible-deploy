@@ -28,6 +28,7 @@ NN-*.yaml                 # 프리셋 플레이북
 roles/                    # 재사용 role
 inventory/all.ini.vault   # 인벤토리 (vault 암호화)
 group_vars/all/vault.yaml # 공통 변수 (vault 암호화) — 평문 예시: vault.yaml.example
+docs/variables.md         # 변수별 넣을 값 / 추천 / 참고 링크
 ```
 
 ## 실행
@@ -41,7 +42,7 @@ ansible-playbook -i inventory/all.ini.vault 01-base.yaml --vault-password-file v
 ... --tags docker
 ```
 
-변수 편집:
+변수 편집 (뭘 넣을지는 [docs/variables.md](docs/variables.md) — 값 목록, 추천, 참고 링크):
 ```bash
 ansible-vault edit group_vars/all/vault.yaml --vault-password-file vault_password.txt
 ```

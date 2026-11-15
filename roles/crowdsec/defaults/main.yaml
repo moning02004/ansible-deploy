@@ -1,13 +1,15 @@
 crowdsec_version: "v1.8.2"                 # https://hub.docker.com/r/crowdsecurity/crowdsec
 crowdsec_dir: /opt/crowdsec
 crowdsec_lapi_port: 8180                   # 127.0.0.1 에만 (호스트의 방화벽 차단기가 접속). 8080 은 wharfline 과 겹침
+# 탐지 규칙 묶음. 통째로 바뀜(기본 항목도 같이 적기)
+#   찾기: https://app.crowdsec.net/hub/collections   추천 조합/주의: docs/variables.md
 crowdsec_collections:
   - crowdsecurity/linux
   - crowdsecurity/sshd
   - crowdsecurity/traefik                   # 03/04/05/07 의 Traefik 액세스 로그
   - crowdsecurity/http-cve
   - crowdsecurity/base-http-scenarios
-# 읽을 로그 (호스트 /var/log 를 /var/log/host 로 마운트)
+# 읽을 로그 (호스트 /var/log 를 /var/log/host 로 마운트). type 은 파서 종류: syslog, traefik, nginx ...
 crowdsec_acquisitions:
   - { path: /var/log/host/auth.log, type: syslog }
   - { path: /var/log/host/traefik/access.log, type: traefik }

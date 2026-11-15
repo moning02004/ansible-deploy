@@ -15,4 +15,4 @@ redis_version: "8.10.3-alpine"         # https://hub.docker.com/_/redis
 redis_port: 6379
 redis_password: ""                     # 필수 (vault)
 redis_maxmemory: 256mb
-redis_maxmemory_policy: allkeys-lru
+redis_maxmemory_policy: allkeys-lru   # 캐시: allkeys-lru / 큐·세션(잃으면 안 됨): noeviction. 전체 표: docs/variables.md

@@ -8,5 +8,5 @@ docker_users:
   - "{{ deploy_user }}"
 docker_log_max_size: 10m
 docker_log_max_file: "3"
-# daemon.json에 추가로 합칠 옵션
+# daemon.json에 추가로 합칠 옵션. 예) live-restore, registry-mirrors (docs/variables.md)
 docker_daemon_options: {}

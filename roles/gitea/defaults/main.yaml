@@ -15,4 +15,4 @@ gitea_admin_password: ""           # 필수 (vault)
 
 gitea_runner_enabled: true
 gitea_runner_name: "{{ inventory_hostname }}-runner"
-gitea_runner_labels: ""            # 비우면 act_runner 기본 라벨 (ubuntu-latest 등)
+gitea_runner_labels: ""            # 비우면 act_runner 기본 라벨 (ubuntu-latest 등). 형식 "라벨:docker://이미지,..." (docs/variables.md)

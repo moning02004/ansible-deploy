@@ -8,5 +8,5 @@ vpn_subnet: 10.13.13.0               # VPN 내부 대역 (/24)
 vpn_docker_subnet: 172.31.250.0/24
 # 클라이언트가 VPN 으로 보낼 대역. 기본은 VPN 대역만(split tunnel). 전체 트래픽: 0.0.0.0/0
 vpn_allowed_ips: "10.13.13.0/24"
-vpn_peer_dns: auto
+vpn_peer_dns: auto                   # auto 또는 1.1.1.1 같은 DNS 주소
 vpn_fetch_dir: "{{ playbook_dir }}/secrets/{{ inventory_hostname }}/wireguard"

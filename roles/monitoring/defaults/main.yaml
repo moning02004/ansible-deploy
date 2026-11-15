@@ -2,7 +2,7 @@ prometheus_version: "v3.16.0"        # https://hub.docker.com/r/prom/prometheus
 grafana_version: "13.3.1"            # https://hub.docker.com/r/grafana/grafana
 monitoring_dir: /opt/monitoring
 prometheus_port: 9090                # 127.0.0.1 에만
-prometheus_retention: 15d
+prometheus_retention: 15d             # 단위 h d w y. 예) 30d, 1y
 prometheus_scrape_interval: 30s
 alertmanager_version: "v0.35.0"      # https://hub.docker.com/r/prom/alertmanager
 alertmanager_port: 9093              # 127.0.0.1 에만
@@ -21,6 +21,7 @@ grafana_domain: ""                   # 필수. 예) grafana.example.com
 grafana_root_url: "{{ site_scheme | default('http') }}://{{ grafana_domain }}/"
 grafana_admin_password: ""           # 필수 (vault). 최초 기동 때만 적용
 # 기본 대시보드 (grafana.com ID): Node Exporter Full
+#   추천: 14282 (cAdvisor, 컨테이너별), 893 (Docker+시스템). 동작 여부 표: docs/variables.md
 grafana_dashboards:
   - { id: 1860, name: node-exporter-full }
 # 수집 대상: 그룹 이름 (기본 all)

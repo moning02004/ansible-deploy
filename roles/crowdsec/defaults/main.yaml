@@ -12,7 +12,15 @@ crowdsec_acquisitions:
   - { path: /var/log/host/auth.log, type: syslog }
   - { path: /var/log/host/traefik/access.log, type: traefik }
 # 차단하지 않을 관리자 IP / CIDR
-crowdsec_whitelist: "{{ security_whitelist_ips | default([]) }}"
+#   [vpn] 그룹(12-vpn) 서버는 VPN 대역과 WireGuard 컨테이너 네트워크를 자동으로 포함
+#   (VPN 을 거친 요청이 한 주소로 보여, 한 명이 걸리면 VPN 사용자 전체가 차단되는 것을 막음)
+crowdsec_whitelist_vpn: "{{ inventory_hostname in groups.get('vpn', []) }}"
+crowdsec_vpn_ranges:
+  - "{{ vpn_subnet | default('10.13.13.0') }}/24"
+  - "{{ vpn_docker_subnet | default('172.31.250.0/24') }}"
+crowdsec_whitelist: >-
+  {{ (security_whitelist_ips | default([]))
+     + (crowdsec_vpn_ranges if crowdsec_whitelist_vpn | bool else []) }}
 # CrowdSec 콘솔(app.crowdsec.net) 연결 키. 비우면 연결하지 않음
 crowdsec_enroll_key: ""
 # 방화벽 차단기 (호스트 패키지: iptables 를 직접 다뤄야 해서 컨테이너로 두지 않음)

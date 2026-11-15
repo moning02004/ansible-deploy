@@ -4,6 +4,8 @@ vpn_server_url: auto                 # 클라이언트가 접속할 주소 (도�
 vpn_port: 51820                      # UDP
 vpn_peers: [laptop]                  # 접속할 사람/기기 이름 (영문, 숫자)
 vpn_subnet: 10.13.13.0               # VPN 내부 대역 (/24)
+# WireGuard 컨테이너의 Docker 네트워크 (고정해야 CrowdSec 화이트리스트에 넣을 수 있음)
+vpn_docker_subnet: 172.31.250.0/24
 # 클라이언트가 VPN 으로 보낼 대역. 기본은 VPN 대역만(split tunnel). 전체 트래픽: 0.0.0.0/0
 vpn_allowed_ips: "10.13.13.0/24"
 vpn_peer_dns: auto

@@ -68,6 +68,29 @@
       retries: 12
       delay: 5
 
+    - name: VPN ranges are whitelisted automatically ([vpn] group host)
+      ansible.builtin.command: cat /opt/crowdsec/whitelist.yaml
+      register: wlfile
+      changed_when: false
+      failed_when: >-
+        '10.13.13.0/24' not in wlfile.stdout or
+        '172.31.250.0/24' not in wlfile.stdout or
+        '198.51.100.0/24' not in wlfile.stdout
+
+    - name: Simulate SSH failures from a VPN client (10.13.13.2)
+      ansible.builtin.shell: |
+        for i in $(seq 10); do
+          logger -p auth.info -t 'sshd[4244]' "Failed password for invalid user vpn$i from 10.13.13.2 port 7$i ssh2"
+        done
+        sleep 10
+      changed_when: false
+
+    - name: VPN client is not banned
+      ansible.builtin.command: docker exec crowdsec cscli decisions list -i 10.13.13.2 -o raw
+      register: vpnban
+      changed_when: false
+      failed_when: "'ban' in vpnban.stdout"
+
     - name: Whitelisted admin IP is not banned
       ansible.builtin.command: docker exec crowdsec cscli decisions list -i 192.0.2.10 -o raw
       register: wl

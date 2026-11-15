@@ -40,6 +40,12 @@
         'Endpoint = vpn.test:51820' not in conf.stdout or
         'AllowedIPs = 10.13.13.0/24' not in conf.stdout
 
+    - name: WireGuard container uses the fixed Docker subnet
+      ansible.builtin.command: docker network inspect wireguard_default -f '{{ "{{" }}(index .IPAM.Config 0).Subnet{{ "}}" }}'
+      register: wgnet
+      changed_when: false
+      failed_when: wgnet.stdout != '172.31.250.0/24'
+
     - name: Config directory is root-only
       ansible.builtin.stat:
         path: /opt/wireguard

@@ -244,5 +244,7 @@ ansible-playbook ... 11-restore.yaml --limit db1 -e restore_confirm=yes -e '{"re
 ## 12-vpn
 - WireGuard (`linuxserver/wireguard`, `/opt/wireguard`), UDP 51820
 - `vpn_peers: [laptop, phone]` 처럼 이름만 적으면 접속 설정을 만들고 `secrets/<호스트>/wireguard/<이름>.conf` 로 가져옵니다 (gitignore). 폰은 `docker exec wireguard /app/show-peer <이름>` 의 QR 코드로.
+- `[vpn]` 그룹 서버는 08 실행 시 VPN 대역(`10.13.13.0/24`)과 WireGuard 컨테이너 네트워크(`vpn_docker_subnet`, 기본 `172.31.250.0/24`)가 CrowdSec 화이트리스트에 자동으로 들어갑니다. VPN 을 거친 요청이 한 주소로 보여서, 한 명이 걸리면 VPN 사용자 전체가 차단되는 것을 막습니다.
+- CrowdSec 허브의 `crowdsecurity/wireguard` 컬렉션은 쓰지 않습니다. WireGuard 는 키가 틀린 패킷에 응답하지 않아 무차별 대입이 성립하지 않고, 이 컬렉션은 커널 디버그 로그를 켜야 해서 CrowdSec 도 사용을 권하지 않습니다.
 - 기본은 split tunnel (`vpn_allowed_ips: 10.13.13.0/24`). 06/09 의 `*_allowed_sources` 에 VPN 대역을 넣으면 DB · 미들웨어를 VPN 으로만 쓸 수 있습니다.
 - 사람을 추가/삭제하려면 `vpn_peers` 를 바꾸고 다시 실행 (기존 키는 유지)

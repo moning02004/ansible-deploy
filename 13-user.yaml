@@ -8,10 +8,16 @@
 #
 # 같은 계정으로 다시 실행하면 비밀번호와 sudo 여부를 입력한 값으로 바꿉니다.
 # sudo 는 sudo 그룹(비밀번호 입력 필요)으로 줍니다. 비밀번호 없는 sudo 는 01-base 의 deploy 유저만.
-# ⚠️ 08 에서 security_ssh_allow_users 를 썼다면 새 계정도 거기 넣고 08 을 다시 돌려야 SSH 로 들어갈 수 있습니다
+# 08 에서 AllowUsers 를 켰다면 새 계정을 거기에 더합니다 (08 을 다시 돌릴 때를 위해 security_ssh_allow_users 에도 넣어 두세요)
+#
+# Wharfline 에서 실행: 계정 이름 / 비밀번호 / sudo 는 입력칸으로 나옵니다.
+#   become_password: 접속 계정의 sudo 비밀번호. 접속 계정이 비밀번호 없이 sudo 되면 비워 둡니다.
+#   account_ssh_keys: 등록할 SSH 공개키, 한 줄에 하나씩. 없으면 비워 둡니다.
 - name: "13 user | 계정 추가"
   hosts: "{{ account_hosts | default('all') }}"
   become: true
+  # facts 를 모으는 것도 sudo 로 하므로, sudo 비밀번호를 먼저 정한 뒤 role 이 필요한 것만 읽습니다
+  gather_facts: false
 
   vars_prompt:
     - name: account_name
@@ -25,6 +31,21 @@
       prompt: sudo 권한 (yes/no)
       private: false
       default: "no"
+
+  pre_tasks:
+    - name: Use the given sudo password
+      ansible.builtin.set_fact:
+        ansible_become_password: "{{ become_password }}"
+      when: become_password | default('') | length > 0
+      no_log: true
+      tags: [user]
+
+    # role 의 비밀번호 작업은 no_log 라 실패 이유가 가려지므로, sudo 가 되는지 먼저 확인 (안 되면 "Missing sudo password")
+    - name: Check sudo
+      ansible.builtin.command: "true"
+      changed_when: false
+      check_mode: false
+      tags: [user]
 
   roles:
     - { role: account, tags: [user] }

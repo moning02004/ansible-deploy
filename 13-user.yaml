@@ -1,0 +1,30 @@
+# 13. user — 사람 계정 추가 / 비밀번호 변경 / sudo 권한 변경
+#   모든 서버에 적용 (단독 실행용). 일부 서버만: --limit server1
+#   실행하면 계정, 비밀번호, sudo 여부를 묻습니다. -e 로 넘긴 값은 묻지 않습니다.
+#
+# 실행:
+#   ansible-playbook -i inventory/all.ini.vault 13-user.yaml --vault-password-file vault_password.txt
+#   SSH 키도 등록: -e '{"account_ssh_keys":["ssh-ed25519 AAAA... me@laptop"]}'
+#
+# 같은 계정으로 다시 실행하면 비밀번호와 sudo 여부를 입력한 값으로 바꿉니다.
+# sudo 는 sudo 그룹(비밀번호 입력 필요)으로 줍니다. 비밀번호 없는 sudo 는 01-base 의 deploy 유저만.
+# ⚠️ 08 에서 security_ssh_allow_users 를 썼다면 새 계정도 거기 넣고 08 을 다시 돌려야 SSH 로 들어갈 수 있습니다
+- name: "13 user | 계정 추가"
+  hosts: "{{ account_hosts | default('all') }}"
+  become: true
+
+  vars_prompt:
+    - name: account_name
+      prompt: 계정 이름
+      private: false
+    - name: account_password
+      prompt: 비밀번호 (8자 이상)
+      private: true
+      confirm: true
+    - name: account_sudo
+      prompt: sudo 권한 (yes/no)
+      private: false
+      default: "no"
+
+  roles:
+    - { role: account, tags: [user] }

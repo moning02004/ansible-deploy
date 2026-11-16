@@ -52,6 +52,13 @@ backup_restic_password: test-restic-pw
 restore_confirm: "yes"
 restore_components: [postgres, gitea, wharfline, rabbitmq, redis]
 
+# 13 user (vars_prompt 대신)
+account_name: alice
+account_password: test-alice-pw
+account_sudo: true
+account_ssh_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl test@orca"
+
 # 02 kubernetes (테스트 컨테이너는 Docker Desktop VM 커널을 공유)
 k8s_disable_swap: false                   # VM 의 swap 을 끄지 않음 → kubelet failSwapOn=false
 k8s_load_kernel_modules: false            # 컨테이너엔 /lib/modules 가 없음 (overlay, br_netfilter 는 VM 커널에 내장)

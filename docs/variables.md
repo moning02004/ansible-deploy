@@ -281,5 +281,15 @@ crowdsec_acquisitions:
 
 ---
 
+## 13 user (실행할 때 입력, 또는 `-e` 로)
+
+- `account_name`: 영문 소문자로 시작하는 소문자·숫자·`_`·`-` (32자 이하). `root` 와 `deploy_user` 는 안 됨. ⭐ 사람 이름 그대로 `alice`, `jdoe`.
+- `account_password`: 8자 이상. ⭐ 입력 받기 (`-e` 는 셸 기록에 남음). 처음 들어간 뒤 `passwd` 로 본인이 바꾸게 해도 됩니다.
+- `account_sudo`: `yes` / `no` (기본 `no`). ⭐ 서버를 직접 관리하는 사람만 `yes`.
+- `account_ssh_keys`: 선택. 공개키 목록. ⭐ 08 에서 비밀번호 로그인을 막을 거면 필수. 키 만들기: `ssh-keygen -t ed25519`
+- `account_shell`: 기본 `/bin/bash`.
+
+---
+
 ## 버전 올리기
 각 role defaults 의 `*_version` 옆에 릴리스 링크가 있습니다. 올린 뒤 `tests/run.sh NN-xxx.yaml` 로 확인하세요.

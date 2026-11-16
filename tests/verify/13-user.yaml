@@ -1,0 +1,70 @@
+# 13-user 결과 점검
+- name: "verify | 13 user"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: User exists with bash shell
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ account_name }}"
+
+    - name: Check shell and home
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.getent_passwd[account_name][4] == '/home/' ~ account_name
+          - ansible_facts.getent_passwd[account_name][5] == '/bin/bash'
+        quiet: true
+
+    - name: User is in sudo group
+      ansible.builtin.command: "id -nG {{ account_name }}"
+      register: groups_out
+      changed_when: false
+      failed_when: "'sudo' not in groups_out.stdout.split()"
+
+    - name: Password works for sudo
+      ansible.builtin.shell: echo "$PW" | sudo -S -k -p '' true
+      environment:
+        PW: "{{ account_password }}"
+      become_user: "{{ account_name }}"
+      changed_when: false
+      no_log: true
+
+    - name: Wrong password is rejected
+      ansible.builtin.shell: echo wrong-password | sudo -S -k -p '' true
+      become_user: "{{ account_name }}"
+      register: wrong
+      changed_when: false
+      failed_when: wrong.rc == 0
+
+    - name: SSH key is registered
+      ansible.builtin.command: "cat /home/{{ account_name }}/.ssh/authorized_keys"
+      register: keys
+      changed_when: false
+      failed_when: account_ssh_keys[0] not in keys.stdout
+
+    # 같은 계정으로 다시 실행: 비밀번호 변경 + sudo 회수
+    - name: Run again with new password and no sudo (-e 로 넘기면 입력을 묻지 않음)
+      ansible.builtin.command:
+        cmd: >-
+          ansible-playbook -i tests/inventory.ini 13-user.yaml
+          -e account_name={{ account_name }} -e account_password=test-alice-pw-2 -e account_sudo=no
+        chdir: "{{ playbook_dir }}/../.."
+        stdin: ""
+      delegate_to: localhost
+      become: false
+      changed_when: false
+
+    - name: User is no longer in sudo group
+      ansible.builtin.command: "id -nG {{ account_name }}"
+      register: groups_after
+      changed_when: false
+      failed_when: "'sudo' in groups_after.stdout.split()"
+
+    - name: Password was changed
+      ansible.builtin.shell: |
+        h=$(getent shadow {{ account_name }} | cut -d: -f2)
+        salt=$(echo "$h" | cut -d'$' -f3)
+        [ "$(echo test-alice-pw-2 | openssl passwd -6 -salt "$salt" -stdin)" = "$h" ]
+      changed_when: false

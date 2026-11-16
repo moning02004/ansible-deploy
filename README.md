@@ -16,6 +16,7 @@
 | 10 | `10-backup.yaml` | 자동 백업 스케줄 설치(`--tags schedule`) / 즉시 백업(`--tags now`) | ✅ |
 | 11 | `11-restore.yaml` | 백업 파일로 복구 | ✅ |
 | 12 | `12-vpn.yaml` | base + WireGuard VPN (관리자 내부망 접속, 접속 설정 자동 생성) | ✅ |
+| 13 | `13-user.yaml` | 사람 계정 추가 / 비밀번호 변경 / sudo 권한 부여·회수 (단독 실행용) | ✅ |
 
 ## 환경
 - ansible-core 2.18 이상
@@ -249,3 +250,18 @@ ansible-playbook ... 11-restore.yaml --limit db1 -e restore_confirm=yes -e '{"re
 - CrowdSec 허브의 `crowdsecurity/wireguard` 컬렉션은 쓰지 않습니다. WireGuard 는 키가 틀린 패킷에 응답하지 않아 무차별 대입이 성립하지 않고, 이 컬렉션은 커널 디버그 로그를 켜야 해서 CrowdSec 도 사용을 권하지 않습니다.
 - 기본은 split tunnel (`vpn_allowed_ips: 10.13.13.0/24`). 06/09 의 `*_allowed_sources` 에 VPN 대역을 넣으면 DB · 미들웨어를 VPN 으로만 쓸 수 있습니다.
 - 사람을 추가/삭제하려면 `vpn_peers` 를 바꾸고 다시 실행 (기존 키는 유지)
+
+## 13-user
+실행하면 계정 이름, 비밀번호(두 번), sudo 여부를 묻습니다. 모든 서버에 적용되니 일부만 할 때는 `--limit` 을 쓰세요.
+
+```bash
+ansible-playbook -i inventory/all.ini.vault 13-user.yaml --vault-password-file vault_password.txt --limit server1
+```
+
+- **sudo**: `yes` 면 `sudo` 그룹에 넣습니다 (sudo 할 때 자기 비밀번호 입력). `no` 로 다시 실행하면 그룹에서 뺍니다. 비밀번호 없는 sudo 는 01-base 의 deploy 유저만 씁니다.
+- 같은 계정으로 다시 실행하면 비밀번호와 sudo 여부를 입력한 값으로 바꿉니다. 비밀번호가 같으면 바뀌는 것이 없습니다 (changed=0).
+- `-e` 로 넘긴 값은 묻지 않습니다. 단, 비밀번호를 `-e` 로 넘기면 셸 기록에 남으니 입력 받는 쪽을 권합니다.
+- SSH 키 등록(선택): `-e '{"account_ssh_keys":["ssh-ed25519 AAAA... me@laptop"]}'`. 08 에서 `security_disable_password_auth: true` 로 했다면 키가 있어야 SSH 로 들어갈 수 있습니다.
+- ⚠️ 08 에서 `security_ssh_allow_users` 를 썼다면 새 계정을 거기에 넣고 08 을 다시 돌려야 SSH 로 들어갈 수 있습니다.
+- 비밀번호 해시(SHA-512)는 대상 서버의 `openssl` 로 만듭니다. 컨트롤러에 `passlib` 가 없어도 됩니다.
+- 계정 삭제는 지원하지 않습니다 (`sudo userdel -r <계정>`).

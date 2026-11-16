@@ -262,6 +262,9 @@ ansible-playbook -i inventory/all.ini.vault 13-user.yaml --vault-password-file v
 - 같은 계정으로 다시 실행하면 비밀번호와 sudo 여부를 입력한 값으로 바꿉니다. 비밀번호가 같으면 바뀌는 것이 없습니다 (changed=0).
 - `-e` 로 넘긴 값은 묻지 않습니다. 단, 비밀번호를 `-e` 로 넘기면 셸 기록에 남으니 입력 받는 쪽을 권합니다.
 - SSH 키 등록(선택): `-e '{"account_ssh_keys":["ssh-ed25519 AAAA... me@laptop"]}'`. 08 에서 `security_disable_password_auth: true` 로 했다면 키가 있어야 SSH 로 들어갈 수 있습니다.
-- ⚠️ 08 에서 `security_ssh_allow_users` 를 썼다면 새 계정을 거기에 넣고 08 을 다시 돌려야 SSH 로 들어갈 수 있습니다.
+- 08 에서 `security_ssh_allow_users` 로 AllowUsers 를 켰다면 새 계정을 거기에 더하고 ssh 를 다시 읽습니다. 08 을 다시 돌리면 그 목록으로 덮어쓰니 `security_ssh_allow_users` 에도 넣어 두세요.
+- 끝에 접속 방법(`ssh <계정>@<서버>`)과, 그 서버가 비밀번호 로그인을 받는지(아니면 SSH 키 필요)를 알려 줍니다.
+- **Wharfline 에서 실행**: 계정 이름 · 비밀번호 · sudo 가 입력칸으로 나옵니다. SSH 키는 `account_ssh_keys` 칸에 한 줄에 하나씩 넣습니다.
+  Wharfline 의 접속 계정이 sudo 할 때 비밀번호를 묻는 서버면 `become_password` 에 그 비밀번호를 넣으세요 (없으면 `Missing sudo password` 로 멈춤).
 - 비밀번호 해시(SHA-512)는 대상 서버의 `openssl` 로 만듭니다. 컨트롤러에 `passlib` 가 없어도 됩니다.
 - 계정 삭제는 지원하지 않습니다 (`sudo userdel -r <계정>`).

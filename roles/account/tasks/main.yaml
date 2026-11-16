@@ -55,11 +55,41 @@
     - not account_sudo | bool
     - account_name in ansible_facts.getent_group.sudo[2].split(',')
 
+# 목록이나 여러 줄 글 (Wharfline 입력칸은 글) 둘 다 받습니다
 - name: Register SSH public keys
   ansible.posix.authorized_key:
     user: "{{ account_name }}"
     key: "{{ item }}"
     state: present
-  loop: "{{ account_ssh_keys }}"
+  loop: "{{ (account_ssh_keys.splitlines() if account_ssh_keys is string else account_ssh_keys) | map('trim') | select | list }}"
   loop_control:
     label: "{{ item | truncate(40) }}"
+
+# 08 security 가 AllowUsers 를 썼다면 이 계정을 더해야 SSH 로 들어올 수 있음
+- name: Check SSH hardening config (08 security)
+  ansible.builtin.stat:
+    path: /etc/ssh/sshd_config.d/00-hardening.conf
+  register: account_hardening
+
+- name: Allow SSH login (AllowUsers)
+  ansible.builtin.replace:
+    path: /etc/ssh/sshd_config.d/00-hardening.conf
+    regexp: '^(AllowUsers\b(?!.*\s{{ account_name }}(\s|$)).*)$'
+    replace: '\1 {{ account_name }}'
+  when: account_hardening.stat.exists
+  notify: Reload ssh
+
+- name: Read SSH login settings
+  ansible.builtin.command: sshd -T
+  register: account_sshd
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: How to log in
+  ansible.builtin.debug:
+    msg: >-
+      ssh {{ account_name }}@{{ ansible_host | default(inventory_hostname) }} -p {{ ansible_port | default(22) }}
+      (홈: /home/{{ account_name }}) ·
+      {{ '비밀번호로 로그인할 수 있어요' if 'passwordauthentication yes' in account_sshd.stdout | lower
+         else '이 서버는 비밀번호 로그인이 막혀 있어 SSH 키로만 들어올 수 있어요' }}

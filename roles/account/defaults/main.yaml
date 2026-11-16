@@ -3,5 +3,5 @@ account_name: ""
 account_password: ""
 account_sudo: false           # true: sudo 그룹에 추가 (sudo 할 때 비밀번호 입력), false: sudo 그룹에서 제거
 account_shell: /bin/bash
-# 선택. 등록할 SSH 공개키 목록 (08 에서 비밀번호 로그인을 막았다면 필요)
+# 선택. 등록할 SSH 공개키 목록, 또는 한 줄에 하나씩 쓴 글 (08 에서 비밀번호 로그인을 막았다면 필요)
 account_ssh_keys: []

@@ -8,7 +8,7 @@
 #
 # 실행:
 #   ansible-playbook -i inventory/all.ini.vault 02-kubernetes.yaml --vault-password-file vault_password.txt
-#   일부만: --tags k8s-addons | k8s-helm | k8s-backup ...   (base 건너뛰기: --skip-tags common,user,firewall,docker)
+#   일부만: --tags k8s-addons | k8s-helm | k8s-backup ...   (base 건너뛰기: --skip-tags common,user,docker)
 #
 # 필수 변수: 없음 (기본값으로 동작). 원격 kubectl: k8s_api_allowed_sources + k8s_api_cert_sans
 # ⚠️ Traefik 이 hostPort 80/443 을 쓰므로 03-gitea · 04-gitlab · 05-app · 07-monitoring(Traefik 80/443) 과 같은 서버에 두지 마세요.

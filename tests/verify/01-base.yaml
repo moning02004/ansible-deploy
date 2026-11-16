@@ -28,13 +28,10 @@
       become_user: "{{ deploy_user }}"
       changed_when: false
 
-    - name: ufw is active and allows SSH
-      ansible.builtin.command: ufw status
-      register: ufw
+    # 01 은 방화벽을 켜지 않아요 (08-security 담당). 다른 role 이 규칙을 등록할 수 있게 ufw 만 설치돼 있어요.
+    - name: ufw is installed
+      ansible.builtin.command: which ufw
       changed_when: false
-      failed_when: >-
-        'Status: active' not in ufw.stdout or
-        ufw.stdout is not search('22/tcp\s+ALLOW')
 
     - name: daemon.json has log rotation
       ansible.builtin.slurp:

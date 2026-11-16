@@ -3,7 +3,7 @@
 #
 # 실행:
 #   ansible-playbook -i inventory/all.ini.vault 03-gitea.yaml --vault-password-file vault_password.txt
-#   일부만: --tags traefik | gitea | wharfline   (base 건너뛰기: --skip-tags common,user,firewall,docker)
+#   일부만: --tags traefik | gitea | wharfline   (base 건너뛰기: --skip-tags common,user,docker)
 #
 # 필수 변수 (vault): gitea_domain, gitea_db_password, gitea_admin_email, gitea_admin_password,
 #                    wharfline_domain, wharfline_postgres_password, wharfline_owner_email, wharfline_owner_password

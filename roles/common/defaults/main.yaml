@@ -13,3 +13,4 @@ common_packages:
   - make              # wharfline 등 서버의 Makefile 명령(make up, make backup)용
   - tzdata
   - iproute2          # ansible_default_ipv4 수집에 필요 (최소 이미지에는 없음)
+  - ufw               # traefik/gitea 등이 포트 규칙을 미리 등록. 켜는 건 08-security (firewall role)

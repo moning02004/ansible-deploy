@@ -4,7 +4,7 @@
 
 | # | 플레이북 | 내용 | 상태 |
 |---|---|---|---|
-| 01 | `01-base.yaml` | 공통 설정, deploy 유저, ufw, Docker, docker rollout | ✅ |
+| 01 | `01-base.yaml` | 공통 설정, deploy 유저, Docker, docker rollout (방화벽은 08) | ✅ |
 | 02 | `02-kubernetes.yaml` | base(Docker) + Kubernetes 단일 노드 (kubeadm, Flannel, Helm, metrics-server, local-path, Traefik ingress, etcd 백업) | ✅ |
 | 03 | `03-gitea.yaml` | base + Traefik + Gitea + act_runner + wharfline | ✅ |
 | 04 | `04-gitlab.yaml` | base + Traefik + GitLab CE + gitlab-runner + wharfline | ✅ |
@@ -77,11 +77,11 @@ UBUNTU_VERSION=22.04 tests/run.sh 01-base    # 다른 Ubuntu 버전
 | `deploy_user_sudo_nopasswd` | `true` | 비밀번호 없이 sudo |
 | `common_timezone` | `Asia/Seoul` | |
 | `common_apt_upgrade` | `false` | 패키지 safe upgrade |
-| `firewall_allowed_tcp_ports` | `[]` | 모두에게 여는 포트 (SSH는 항상 허용) |
-| `firewall_rules` | `[]` | 출발지 제한 규칙 `{port, from, proto}` |
 | `docker_log_max_size` / `_file` | `10m` / `3` | 컨테이너 로그 로테이션 |
 | `docker_rollout_version` | `v0.14` | |
 
+> 방화벽(ufw)은 01-base 에서 켜지 않습니다. 켤 때는 `08-security.yaml` (`--tags firewall`) 을 실행하고, 허용 포트는 `firewall_allowed_tcp_ports` / `firewall_rules` 로 정합니다 (SSH는 항상 허용).
+>
 > ⚠️ Docker로 publish한 포트(`-p 5432:5432`)는 ufw를 우회해서 외부에 열립니다.
 > Traefik 뒤에 둘 서비스는 포트를 publish 하지 말고 `web` 네트워크 + 라벨로 연결하세요. 외부 접근 제어는 07-security에서 다룹니다.
 

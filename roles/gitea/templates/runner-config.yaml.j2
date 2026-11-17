@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# act_runner 설정. 적지 않은 값은 act_runner 기본값을 씁니다 (https://docs.gitea.com/usage/actions/act-runner#configuration)
+log:
+  level: info
+
+runner:
+  file: /data/.runner
+
+container:
+  # 작업 컨테이너를 Gitea 가 있는 네트워크에 띄워야 actions/checkout 이 http://gitea:3000 을 찾아요.
+  # 비워 두면 작업마다 새 네트워크가 생겨 "Could not resolve host: gitea" 로 실패합니다.
+  network: {{ gitea_runner_network }}

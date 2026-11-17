@@ -32,7 +32,8 @@
 
 - name: Create shared network for routed containers
   community.docker.docker_network:
-    name: "{{ traefik_network }}"
+    name: "{{ item }}"
+  loop: "{{ [traefik_network] + traefik_extra_networks }}"
 
 - name: Write docker-compose.yml
   ansible.builtin.template:

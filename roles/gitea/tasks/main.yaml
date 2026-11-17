@@ -43,6 +43,11 @@
   when: gitea_runner_enabled | bool
   register: runner_config
 
+- name: Create network for workflow jobs
+  community.docker.docker_network:
+    name: "{{ gitea_runner_network }}"
+  when: gitea_runner_enabled | bool
+
 - name: Allow Gitea SSH port
   community.general.ufw:
     rule: allow

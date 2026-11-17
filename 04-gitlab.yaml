@@ -17,6 +17,7 @@
 
   vars:
     site_scheme: "{{ 'https' if (traefik_acme_email | default('')) | length > 0 else 'http' }}"
+    traefik_site_domains: ["{{ gitlab_domain }}", "{{ wharfline_domain }}"]
 
   roles:
     - { role: traefik,   tags: [traefik] }

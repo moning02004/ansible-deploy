@@ -1,7 +1,7 @@
 # 08. security — 방화벽 규칙 재적용 + CrowdSec + SSH 강화 + 보안 업데이트 자동 설치
 #   모든 서버에 적용 (단독 실행용). 허용 IP 를 바꿨을 때도 이것만 다시 돌리면 됩니다.
 #
-#   CrowdSec: 엔진은 Docker(/opt/crowdsec), 차단기는 호스트 패키지(iptables 를 직접 다뤄야 해서)
+#   CrowdSec: 엔진은 Docker(/srv/crowdsec), 차단기는 호스트 패키지(iptables 를 직접 다뤄야 해서)
 #     - SSH 로그(auth.log) + Traefik 액세스 로그로 공격 탐지, 커뮤니티 차단 목록 공유
 #     - INPUT 과 DOCKER-USER 체인 모두에서 차단 → Docker 로 연 포트도 보호
 #
@@ -11,6 +11,10 @@
 #
 # ⚠️ security_disable_password_auth: true 로 하기 전에 인벤토리를 SSH 키 접속으로 바꾸세요
 # ⚠️ 관리자 IP 는 security_whitelist_ips 에 넣어 CrowdSec 이 차단하지 않게 하세요
+#
+#   security_hosts  적용할 인벤토리 그룹 (기본 all)
+#   vpn_subnet  12-vpn 의 VPN 대역과 같게 (CrowdSec 이 VPN 접속을 차단하지 않도록)
+#   vpn_docker_subnet  12-vpn 의 Docker 네트워크 대역과 같게
 - name: "08 security | firewall + CrowdSec + ssh hardening"
   hosts: "{{ security_hosts | default('all') }}"
   become: true

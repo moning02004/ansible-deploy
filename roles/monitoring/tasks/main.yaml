@@ -1,3 +1,10 @@
+# 예전 기본 위치 /opt/monitoring 에 있던 서버는 {{ monitoring_dir }} 로 옮김 (roles/service_dir)
+- name: Move service directory from /opt
+  ansible.builtin.import_role:
+    name: service_dir
+  vars:
+    service_dir: "{{ monitoring_dir }}"
+
 - name: Check required variables
   ansible.builtin.assert:
     that:

@@ -1,5 +1,7 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 traefik_version: "v3.7.19"          # https://hub.docker.com/_/traefik
-traefik_dir: /opt/traefik
+traefik_dir: "{{ service_root | default('/srv') }}/traefik"   # service_root 기본 /srv. 예전 기본값 /opt/traefik 에 있으면 처음 실행 때 옮김
 traefik_network: web                # 라우팅할 컨테이너가 붙는 외부 네트워크
 traefik_acme_email: ""              # 지정하면 Let's Encrypt 자동 HTTPS (HTTP → HTTPS 리다이렉트)
 traefik_log_level: INFO

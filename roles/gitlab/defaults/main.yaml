@@ -1,6 +1,8 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 gitlab_version: "19.5.5-ce.0"        # https://hub.docker.com/r/gitlab/gitlab-ce/tags
 gitlab_runner_version: "v19.5.3"     # https://hub.docker.com/r/gitlab/gitlab-runner/tags
-gitlab_dir: /opt/gitlab
+gitlab_dir: "{{ service_root | default('/srv') }}/gitlab"   # service_root 기본 /srv. 예전 기본값 /opt/gitlab 에 있으면 처음 실행 때 옮김
 
 gitlab_domain: ""                    # 필수. 예) gitlab.example.com
 gitlab_external_url: "{{ site_scheme | default('http') }}://{{ gitlab_domain }}"

@@ -1,0 +1,48 @@
+# 서비스 디렉터리를 예전 기본값(/opt/<이름>)에서 새 위치(service_root, 기본 /srv)로 옮깁니다.
+#   쓰는 법 (각 role 맨 앞):  import_role: { name: service_dir }  +  vars: { service_dir: "{{ gitea_dir }}" }
+#   새 위치가 비어 있고 /opt/<이름>/docker-compose.yml 이 있을 때만 → 그 compose 를 내리고(볼륨·데이터는 그대로) 옮김.
+#   그래야 마스터 키·runner 토큰·bouncer 키 같은 파일을 새로 만들지 않고 그대로 씁니다.
+- name: "Check earlier location /opt/{{ service_dir | basename }}"
+  ansible.builtin.stat:
+    path: "/opt/{{ service_dir | basename }}/docker-compose.yml"
+  register: service_dir_old
+  when: service_dir != '/opt/' ~ (service_dir | basename)
+
+- name: "Check {{ service_dir }}"
+  ansible.builtin.stat:
+    path: "{{ service_dir }}"
+  register: service_dir_new
+  when: service_dir_old.stat.exists | default(false)
+
+# 둘 다 있으면 어느 쪽이 진짜인지 모르므로 멈춤 (새 위치에 키를 새로 만들면 비밀 값을 못 읽게 될 수 있음)
+- name: Stop when both locations exist
+  ansible.builtin.fail:
+    msg: >-
+      /opt/{{ service_dir | basename }} 와 {{ service_dir }} 가 둘 다 있습니다. 쓰지 않는 쪽을 지우거나
+      ({{ service_dir | basename }}_dir 로) 쓸 위치를 정한 뒤 다시 실행하세요.
+  when:
+    - service_dir_old.stat.exists | default(false)
+    - service_dir_new.stat.exists
+
+- name: "Move /opt/{{ service_dir | basename }} → {{ service_dir }}"
+  when:
+    - service_dir_old.stat.exists | default(false)
+    - not service_dir_new.stat.exists
+  block:
+    - name: Stop containers of the old location (volumes are kept)
+      ansible.builtin.command: docker compose down
+      args:
+        chdir: "/opt/{{ service_dir | basename }}"
+
+    - name: Create parent directory
+      ansible.builtin.file:
+        path: "{{ service_dir | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Move directory
+      ansible.builtin.command: mv "/opt/{{ service_dir | basename }}" "{{ service_dir }}"
+
+    - name: Moved
+      ansible.builtin.debug:
+        msg: "📦 /opt/{{ service_dir | basename }} → {{ service_dir }} 로 옮겼습니다. 컨테이너는 새 위치에서 다시 뜹니다."

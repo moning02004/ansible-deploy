@@ -74,7 +74,7 @@
     - name: wharfline backend is healthy and migrate finished
       ansible.builtin.command: docker compose ps -a --format '{{ "{{" }}.Service{{ "}}" }} {{ "{{" }}.State{{ "}}" }} {{ "{{" }}.Health{{ "}}" }} {{ "{{" }}.ExitCode{{ "}}" }}'
       args:
-        chdir: /opt/wharfline
+        chdir: /srv/wharfline
       register: wf_ps
       changed_when: false
       failed_when: >-
@@ -93,11 +93,11 @@
         "import os, urllib.request; u = os.environ['WHARFLINE_GITEA_URL']; assert '{{ gitea_domain }}' in u, u;
         urllib.request.urlopen(u + '/api/healthz', timeout=10)"
       args:
-        chdir: /opt/wharfline
+        chdir: /srv/wharfline
       changed_when: false
 
     - name: Traefik keeps the registered domains
-      ansible.builtin.command: cat /opt/traefik/aliases.json
+      ansible.builtin.command: cat /srv/traefik/aliases.json
       register: aliases
       changed_when: false
       failed_when: >-
@@ -107,7 +107,7 @@
     - name: wharfline Owner was created
       ansible.builtin.command: docker compose logs migrate
       args:
-        chdir: /opt/wharfline
+        chdir: /srv/wharfline
       register: wf_migrate
       changed_when: false
       failed_when: "'Owner' not in wf_migrate.stdout"
@@ -116,9 +116,9 @@
       ansible.builtin.stat:
         path: "{{ item.path }}"
       loop:
-        - { path: /opt/gitea/.env,          mode: "0600" }
-        - { path: /opt/wharfline/.env,      mode: "0600" }
-        - { path: /opt/wharfline/secrets,   mode: "0700" }
+        - { path: /srv/gitea/.env,          mode: "0600" }
+        - { path: /srv/wharfline/.env,      mode: "0600" }
+        - { path: /srv/wharfline/secrets,   mode: "0700" }
       register: perms
       failed_when: perms.stat.mode != item.mode
 

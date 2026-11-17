@@ -69,7 +69,7 @@
       delay: 5
 
     - name: VPN ranges are whitelisted automatically ([vpn] group host)
-      ansible.builtin.command: cat /opt/crowdsec/whitelist.yaml
+      ansible.builtin.command: cat /srv/crowdsec/whitelist.yaml
       register: wlfile
       changed_when: false
       failed_when: >-

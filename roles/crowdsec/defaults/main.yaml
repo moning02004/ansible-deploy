@@ -1,5 +1,7 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 crowdsec_version: "v1.8.2"                 # https://hub.docker.com/r/crowdsecurity/crowdsec
-crowdsec_dir: /opt/crowdsec
+crowdsec_dir: "{{ service_root | default('/srv') }}/crowdsec"   # service_root 기본 /srv. 예전 기본값 /opt/crowdsec 에 있으면 처음 실행 때 옮김
 crowdsec_lapi_port: 8180                   # 127.0.0.1 에만 (호스트의 방화벽 차단기가 접속). 8080 은 wharfline 과 겹침
 # 탐지 규칙 묶음. 통째로 바뀜(기본 항목도 같이 적기)
 #   찾기: https://app.crowdsec.net/hub/collections   추천 조합/주의: docs/variables.md
@@ -20,6 +22,8 @@ crowdsec_whitelist_vpn: "{{ inventory_hostname in groups.get('vpn', []) }}"
 crowdsec_vpn_ranges:
   - "{{ vpn_subnet | default('10.13.13.0') }}/24"
   - "{{ vpn_docker_subnet | default('172.31.250.0/24') }}"
+# 관리자 IP / 대역: CrowdSec 이 차단하지 않음. 예) [203.0.113.10, 198.51.100.0/24]
+security_whitelist_ips: []
 crowdsec_whitelist: >-
   {{ (security_whitelist_ips | default([]))
      + (crowdsec_vpn_ranges if crowdsec_whitelist_vpn | bool else []) }}
@@ -27,4 +31,4 @@ crowdsec_whitelist: >-
 crowdsec_enroll_key: ""
 # 방화벽 차단기 (호스트 패키지: iptables 를 직접 다뤄야 해서 컨테이너로 두지 않음)
 crowdsec_bouncer_chains: [INPUT, DOCKER-USER]   # DOCKER-USER: Docker 로 연 포트도 차단
-crowdsec_bouncer_key: ""                    # 비우면 서버에서 한 번 만들어 /opt/crowdsec/.env 에 보관
+crowdsec_bouncer_key: ""                    # 비우면 서버에서 한 번 만들어 <crowdsec_dir>/.env 에 보관

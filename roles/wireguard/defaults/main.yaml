@@ -1,5 +1,7 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 wireguard_version: "1.0.20260223-r0-ls130"   # https://hub.docker.com/r/linuxserver/wireguard
-wireguard_dir: /opt/wireguard
+wireguard_dir: "{{ service_root | default('/srv') }}/wireguard"   # service_root 기본 /srv. 예전 기본값 /opt/wireguard 에 있으면 처음 실행 때 옮김
 vpn_server_url: auto                 # 클라이언트가 접속할 주소 (도메인/공인 IP). auto: 공인 IP 자동 감지
 vpn_port: 51820                      # UDP
 vpn_peers: [laptop]                  # 접속할 사람/기기 이름 (영문, 숫자)

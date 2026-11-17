@@ -1,6 +1,6 @@
 - name: "gitea | stop gitea and runner"
   ansible.builtin.command: docker compose stop gitea runner
-  args: { chdir: /opt/gitea }
+  args: { chdir: "{{ restore_dirs.gitea }}" }
 
 - name: "gitea | restore database"
   ansible.builtin.shell: >-
@@ -14,4 +14,4 @@
 
 - name: "gitea | start"
   ansible.builtin.command: docker compose up -d --wait
-  args: { chdir: /opt/gitea }
+  args: { chdir: "{{ restore_dirs.gitea }}" }

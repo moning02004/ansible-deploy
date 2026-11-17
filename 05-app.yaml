@@ -15,6 +15,11 @@
   hosts: app
   become: true
 
+  vars:
+    # 서버 안에서도 예시 앱 도메인이 Traefik 으로 (내 앱 도메인은 traefik_domain_aliases 에)
+    traefik_site_domains: "{{ [app_example_domain] if app_example_enabled | default(false) | bool else [] }}"
+    traefik_extra_networks: []
+
   roles:
     - { role: traefik,  tags: [traefik] }
     - { role: app_host, tags: [app] }

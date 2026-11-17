@@ -1,7 +1,9 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 backup_dir: /var/backups/orca
 backup_keep_days: 7
 backup_schedule: "*-*-* 03:00:00"          # systemd OnCalendar 형식. 예시: docs/variables.md
-backup_include_configs: true               # /opt/*/docker-compose.yml, .env 등 (비밀 값 포함 → 백업 디렉터리는 root 0700)
+backup_include_configs: true               # /srv/*/docker-compose.yml, .env 등 (예전 서버는 /opt/* 도) (비밀 값 포함 → 백업 디렉터리는 root 0700)
 
 # 외부 저장소 (restic). 비우면 서버 로컬에만 보관
 #   예) s3:https://kr.object.ncloudstorage.com/my-bucket/orca   /   b2:bucket:orca   /   /mnt/nas/orca

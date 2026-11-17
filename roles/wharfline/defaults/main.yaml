@@ -1,8 +1,10 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 # https://github.com/moning02004/wharfline/releases (이미지 태그 = 릴리스 태그)
 # 주의: 이미지가 amd64 전용
 wharfline_version: v2026.11.14-1
 wharfline_repo_raw: https://raw.githubusercontent.com/moning02004/wharfline
-wharfline_dir: /opt/wharfline
+wharfline_dir: "{{ service_root | default('/srv') }}/wharfline"   # service_root 기본 /srv. 예전 기본값 /opt/wharfline 에 있으면 처음 실행 때 옮김
 
 wharfline_domain: ""                  # 필수. 예) deploy.example.com
 wharfline_url: "{{ site_scheme | default('http') }}://{{ wharfline_domain }}"

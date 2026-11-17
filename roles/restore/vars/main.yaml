@@ -1,0 +1,9 @@
+# 복구할 수 있는 구성 요소와 각각에 필요한 백업 파일 (바꿀 값이 아님)
+restore_known_components: [postgres, gitea, wharfline, gitlab, rabbitmq, redis]
+restore_required_files:
+  postgres:  [postgres-all.sql.gz]
+  gitea:     [gitea-db.dump, gitea-data.tar.gz]
+  wharfline: [wharfline-db.dump]
+  gitlab:    [gitlab_backup.tar, gitlab-config.tar.gz]
+  rabbitmq:  [rabbitmq-definitions.json]
+  redis:     [redis-dump.rdb]

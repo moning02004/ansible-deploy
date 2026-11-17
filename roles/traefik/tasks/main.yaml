@@ -1,3 +1,10 @@
+# 예전 기본 위치 /opt/traefik 에 있던 서버는 {{ traefik_dir }} 로 옮김 (roles/service_dir)
+- name: Move service directory from /opt
+  ansible.builtin.import_role:
+    name: service_dir
+  vars:
+    service_dir: "{{ traefik_dir }}"
+
 - name: Create traefik directories
   ansible.builtin.file:
     path: "{{ item }}"

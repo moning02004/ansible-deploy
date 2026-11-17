@@ -29,8 +29,12 @@ if running gitea-db; then
   vol_exists gitea_gitea_data && vol_tar gitea_gitea_data "$OUT/gitea-data.tar.gz"
 fi
 
+# 서비스 디렉터리: {{ service_root | default('/srv') }}/<이름> (예전 서버는 /opt/<이름>)
+ROOTS="{{ service_root | default('/srv') }} /opt"
+svc_dir() { for r in $ROOTS; do [ -f "$r/$1/docker-compose.yml" ] && { echo "$r/$1"; return; }; done; return 1; }
+
 # wharfline (DB. 마스터 키는 vault 에 따로 보관)
-if [ -f /opt/wharfline/docker-compose.yml ] && running wharfline-db-1; then
+if svc_dir wharfline >/dev/null && running wharfline-db-1; then
   log "wharfline: pg_dump"
   docker exec wharfline-db-1 pg_dump -U wharfline -Fc wharfline > "$OUT/wharfline-db.dump"
 fi
@@ -58,12 +62,14 @@ if running redis; then
 fi
 
 {% if backup_include_configs %}
-# 설정 파일
-if compgen -G "/opt/*/docker-compose.yml" >/dev/null; then
-  log "configs: /opt/*"
-  tar czf "$OUT/opt-configs.tar.gz" --ignore-failed-read -C /opt \
-    $(cd /opt && ls -d */docker-compose.yml */docker-compose.override.yml */.env */*.env */prometheus.yml */secrets 2>/dev/null) || true
-fi
+# 설정 파일 (루트마다: srv-configs.tar.gz, 예전 서버면 opt-configs.tar.gz)
+for r in $ROOTS; do
+  if compgen -G "$r/*/docker-compose.yml" >/dev/null; then
+    log "configs: $r/*"
+    tar czf "$OUT/$(basename "$r")-configs.tar.gz" --ignore-failed-read -C "$r" \
+      $(cd "$r" && ls -d */docker-compose.yml */docker-compose.override.yml */.env */*.env */prometheus.yml */secrets 2>/dev/null) || true
+  fi
+done
 {% endif %}
 
 (cd "$OUT" && ls -la > MANIFEST && sha256sum $(ls | grep -v MANIFEST) >> MANIFEST 2>/dev/null || true)

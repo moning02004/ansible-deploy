@@ -122,7 +122,9 @@ Docker(01-base) 위에 **kubeadm 으로 단일 노드 Kubernetes** 를 설치합
 - **Gitea 관리자**: `gitea_admin`. `admin` 은 Gitea 예약어라 쓸 수 없습니다.
 - **act_runner**: 첫 실행 때 토큰을 발급해 자동 등록합니다. 다시 등록하려면 `/opt/gitea/runner.env` 와 `gitea_runner_data` 볼륨을 지우고 재실행하세요.
 - **작업 컨테이너 네트워크**: 워크플로 작업은 `gitea_actions` 네트워크(Gitea·Traefik 만 함께 붙음)에서 실행돼 `actions/checkout` 이 `http://gitea:3000` 으로 받아 옵니다. DB 나 다른 컨테이너에 직접 닿지는 않아요. 바꾸려면 `gitea_runner_network`.
-- **서버 안에서 도메인 접속**: Traefik 컨테이너가 `gitea_domain`·`wharfline_domain` 을 네트워크 alias 로 가져서, `web`·`gitea_actions` 의 컨테이너가 `http(s)://git.<도메인>`, `deploy.<도메인>` 으로 접속하면 공인 IP 를 돌지 않고 바로 Traefik 으로 갑니다. 다른 도메인은 `traefik_domain_aliases` 에 더하세요.
+- **서버 안에서 도메인 접속**: Traefik 컨테이너가 `gitea_domain`·`wharfline_domain` 을 네트워크 alias 로 가져서, `web`·`gitea_actions` 의 컨테이너가 `http(s)://git.<도메인>`, `deploy.<도메인>` 으로 접속하면 공인 IP 를 돌지 않고 바로 Traefik 으로 갑니다. 그래서 워크플로·wharfline 에는 `gitea:3000` 같은 내부 이름 대신 **밖에서 쓰는 주소를 그대로** 적으면 됩니다. 다른 도메인은 `traefik_domain_aliases` 에 더하세요.
+  - 플레이북마다 등록한 도메인·네트워크는 `/opt/traefik/aliases.json` 에 모여서, 같은 서버에 03 다음 05·07 을 돌려도 빠지지 않습니다. 서비스를 지웠으면 `traefik_forget: [도메인 또는 네트워크]` 로 빼세요.
+- **wharfline ↔ Gitea**: `WHARFLINE_GITEA_URL`(.env 업로드 확인)을 Gitea 도메인으로 자동 설정합니다 (`wharfline_gitea_url`).
 - **wharfline 마스터 키**: `wharfline_master_key` 를 비워 두면 첫 실행 때 서버에서 만들고 `secrets/<호스트>/wharfline_master_keys` 로 가져옵니다(gitignore). **vault 로 옮기고 로컬 파일은 지우세요.** 잃으면 저장된 비밀 값을 복구할 수 없습니다.
 - **wharfline 이미지는 amd64 전용**입니다. ARM 서버에서는 `wharfline_platform: linux/amd64` 로 에뮬레이션 실행할 수 있습니다(느림).
 
@@ -133,6 +135,7 @@ Docker(01-base) 위에 **kubeadm 으로 단일 노드 Kubernetes** 를 설치합
 - **메모리 4GB 이상**. `gitlab_low_memory: true`(기본)는 puma 단일 프로세스, 내장 모니터링 끄기로 메모리를 아낍니다. 8GB 이상이면 false 로.
 - **`gitlab_root_password` 는 무작위 문자열로** (`openssl rand -base64 18`). GitLab 은 흔한 단어 조합 비밀번호면 root 를 만들지 않고 조용히 기동합니다. role 이 이를 감지해 다시 만들고, 그래도 안 되면 이유를 보여 주고 중단합니다.
 - runner: 첫 실행 때 root 의 단기 토큰(1일, create_runner 권한)으로 인스턴스 러너를 만들어 등록합니다.
+- **CI 작업 컨테이너 네트워크**: 작업은 `gitlab_jobs` 네트워크(GitLab·Traefik 만 함께 붙음)에서 실행됩니다. 작업은 `external_url`(`gitlab.<도메인>`)로 clone 하는데, Traefik 이 `gitlab_domain`·`wharfline_domain` 을 alias 로 가져서 서버 안에서도 그 주소가 풀립니다. 예전에 `gitlab_default` 로 등록된 러너는 재실행하면 네트워크만 바꿉니다. 바꾸려면 `gitlab_runner_network`.
 - 첫 기동은 5~10분 걸립니다.
 
 ## 05-app

@@ -36,6 +36,11 @@
     group: "{{ deploy_user }}"
     mode: "0644"
 
+- name: Create network for CI jobs
+  community.docker.docker_network:
+    name: "{{ gitlab_runner_network }}"
+  when: gitlab_runner_enabled | bool
+
 - name: Allow GitLab SSH port
   community.general.ufw:
     rule: allow
@@ -139,4 +144,14 @@
               - --executor=docker
               - "--docker-image={{ gitlab_runner_docker_image }}"
               - "--name={{ gitlab_runner_name }}"
-              - --docker-network-mode=gitlab_default
+              - "--docker-network-mode={{ gitlab_runner_network }}"
+
+    # 예전에 gitlab_default 로 등록된 러너: 작업이 gitlab 도메인을 못 찾아 clone 이 실패하므로 네트워크만 바꿈
+    # (gitlab-runner 는 config.toml 이 바뀌면 스스로 다시 읽음)
+    - name: Run CI jobs on {{ gitlab_runner_network }}
+      ansible.builtin.command:
+        argv: [docker, exec, gitlab-runner, sed, -i, -E,
+               's|^(\s*network_mode\s*=\s*).*|\1"{{ gitlab_runner_network }}"|', /etc/gitlab-runner/config.toml]
+      when:
+        - "'[[runners]]' in runner_cfg.stdout"
+        - "('network_mode = \"' ~ gitlab_runner_network ~ '\"') not in runner_cfg.stdout"

@@ -81,6 +81,29 @@
         wf_ps.stdout is not search('backend running healthy') or
         wf_ps.stdout is not search('migrate exited\s+0')
 
+    - name: Workflow job network reaches the site domains through Traefik
+      ansible.builtin.command: >-
+        docker run --rm --network {{ gitea_runner_network | default('gitea_actions') }} alpine:3.20
+        sh -c 'wget -qO- http://{{ gitea_domain }}/api/healthz && wget -qO- http://{{ wharfline_domain }}/ | grep -qi "<html"'
+      changed_when: false
+
+    - name: wharfline backend reaches Gitea at WHARFLINE_GITEA_URL (the domain)
+      ansible.builtin.command: >-
+        docker compose exec -T backend python -c
+        "import os, urllib.request; u = os.environ['WHARFLINE_GITEA_URL']; assert '{{ gitea_domain }}' in u, u;
+        urllib.request.urlopen(u + '/api/healthz', timeout=10)"
+      args:
+        chdir: /opt/wharfline
+      changed_when: false
+
+    - name: Traefik keeps the registered domains
+      ansible.builtin.command: cat /opt/traefik/aliases.json
+      register: aliases
+      changed_when: false
+      failed_when: >-
+        gitea_domain not in (aliases.stdout | from_json).aliases or
+        wharfline_domain not in (aliases.stdout | from_json).aliases
+
     - name: wharfline Owner was created
       ansible.builtin.command: docker compose logs migrate
       args:

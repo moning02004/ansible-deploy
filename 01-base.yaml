@@ -6,6 +6,8 @@
 #   ansible-playbook -i inventory/all.ini.vault 01-base.yaml --vault-password-file vault_password.txt
 #   특정 서버만:   --limit server1
 #   일부만:        --tags docker   (common / user / docker / rollout)
+#
+#   base_hosts  적용할 인벤토리 그룹 (기본 all, 다른 프리셋이 import 할 때는 그 그룹)
 - name: "01 base | 기본 서버 구성"
   hosts: "{{ base_hosts | default('all') }}"   # 다른 프리셋에서 import 할 때 대상 그룹으로 바뀜
   become: true

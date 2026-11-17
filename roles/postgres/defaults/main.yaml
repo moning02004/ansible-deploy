@@ -1,5 +1,7 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 postgres_version: "18.7"             # https://hub.docker.com/_/postgres
-postgres_dir: /opt/postgres
+postgres_dir: "{{ service_root | default('/srv') }}/postgres"   # service_root 기본 /srv. 예전 기본값 /opt/postgres 에 있으면 처음 실행 때 옮김
 postgres_superuser_password: ""      # 필수 (vault). 유저 이름은 postgres
 postgres_bind: 0.0.0.0
 postgres_port: 5432

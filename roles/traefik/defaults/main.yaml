@@ -1,5 +1,7 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 traefik_version: "v3.7.19"          # https://hub.docker.com/_/traefik
-traefik_dir: /opt/traefik
+traefik_dir: "{{ service_root | default('/srv') }}/traefik"   # service_root 기본 /srv. 예전 기본값 /opt/traefik 에 있으면 처음 실행 때 옮김
 traefik_network: web                # 라우팅할 컨테이너가 붙는 외부 네트워크
 traefik_acme_email: ""              # 지정하면 Let's Encrypt 자동 HTTPS (HTTP → HTTPS 리다이렉트)
 traefik_log_level: INFO
@@ -11,9 +13,12 @@ traefik_read_timeout: "0s"
 #   - { name: grafana, host: grafana.example.com, url: "http://host.docker.internal:3001" }
 traefik_file_routes: []
 # 서버 안 컨테이너가 이 도메인으로 접속하면 공인 IP 를 돌지 않고 바로 Traefik 으로 갑니다 (네트워크 alias).
-#   traefik_site_domains 는 플레이북이 채우고 (03: gitea·wharfline 도메인), 더할 것은 traefik_domain_aliases 에.
-#   traefik_file_routes 의 host 도 자동으로 들어갑니다.
+#   traefik_site_domains 는 플레이북이 채우고 (03: gitea·wharfline, 04: gitlab·wharfline), 더할 것은 traefik_domain_aliases 에.
+#   traefik_file_routes 의 host (07: grafana) 도 자동으로 들어갑니다.
+#   이 서버에서 돌린 플레이북들의 도메인은 {{ traefik_dir }}/aliases.json 에 모여서, 03 다음에 05·07 을 돌려도 빠지지 않습니다.
 traefik_site_domains: []
 traefik_domain_aliases: []
-# Traefik 이 함께 붙는 네트워크 (03: Gitea 작업 컨테이너의 gitea_actions). 같은 alias 를 씁니다. 없으면 만듭니다
+# Traefik 이 함께 붙는 네트워크 (03: gitea_actions, 04: gitlab_jobs — CI 작업 컨테이너용). 같은 alias 를 씁니다. 없으면 만듭니다
 traefik_extra_networks: []
+# 모아 둔 도메인·네트워크에서 뺄 것 (서비스를 지웠을 때). 예) [git.old.example.com, gitea_actions]
+traefik_forget: []

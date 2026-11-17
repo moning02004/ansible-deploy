@@ -48,6 +48,6 @@
 
     - name: Config directory is root-only
       ansible.builtin.stat:
-        path: /opt/wireguard
+        path: /srv/wireguard
       register: wgdir
       failed_when: wgdir.stat.mode != '0700'

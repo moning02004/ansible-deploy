@@ -62,6 +62,16 @@
       delay: 10
       failed_when: "'is valid' not in (rverify.stdout ~ rverify.stderr)"
 
+    - name: CI jobs run on gitlab_jobs
+      ansible.builtin.command: docker exec gitlab-runner grep -E 'network_mode\s*=\s*"gitlab_jobs"' /etc/gitlab-runner/config.toml
+      changed_when: false
+
+    - name: CI job network reaches the GitLab domain through Traefik
+      ansible.builtin.command: >-
+        docker run --rm --network gitlab_jobs alpine:3.20
+        wget -qO /dev/null http://{{ gitlab_domain }}/users/sign_in
+      changed_when: false
+
     - name: GitLab SSH port is listening
       ansible.builtin.wait_for:
         port: "{{ gitlab_ssh_port | default(2222) }}"

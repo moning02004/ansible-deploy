@@ -11,6 +11,8 @@
 #
 # 구성 요소: postgres, gitea, wharfline, gitlab, rabbitmq, redis
 #   서비스는 미리 설치돼 있어야 합니다 (새 서버라면 01 + 해당 프리셋을 먼저 실행)
+#
+#   restore_hosts  적용할 인벤토리 그룹 (기본 all). 한 서버만 고르세요
 - name: "11 restore"
   hosts: "{{ restore_hosts | default('all') }}"
   become: true

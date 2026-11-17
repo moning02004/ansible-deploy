@@ -1,3 +1,10 @@
+# 예전 기본 위치 /opt/monitoring-agent 에 있던 서버는 {{ monitoring_agent_dir }} 로 옮김 (roles/service_dir)
+- name: Move service directory from /opt
+  ansible.builtin.import_role:
+    name: service_dir
+  vars:
+    service_dir: "{{ monitoring_agent_dir }}"
+
 - name: Create agent directory
   ansible.builtin.file:
     path: "{{ monitoring_agent_dir }}"

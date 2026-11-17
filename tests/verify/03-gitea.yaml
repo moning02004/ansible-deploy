@@ -74,17 +74,40 @@
     - name: wharfline backend is healthy and migrate finished
       ansible.builtin.command: docker compose ps -a --format '{{ "{{" }}.Service{{ "}}" }} {{ "{{" }}.State{{ "}}" }} {{ "{{" }}.Health{{ "}}" }} {{ "{{" }}.ExitCode{{ "}}" }}'
       args:
-        chdir: /opt/wharfline
+        chdir: /srv/wharfline
       register: wf_ps
       changed_when: false
       failed_when: >-
         wf_ps.stdout is not search('backend running healthy') or
         wf_ps.stdout is not search('migrate exited\s+0')
 
+    - name: Workflow job network reaches the site domains through Traefik
+      ansible.builtin.command: >-
+        docker run --rm --network {{ gitea_runner_network | default('gitea_actions') }} alpine:3.20
+        sh -c 'wget -qO- http://{{ gitea_domain }}/api/healthz && wget -qO- http://{{ wharfline_domain }}/ | grep -qi "<html"'
+      changed_when: false
+
+    - name: wharfline backend reaches Gitea at WHARFLINE_GITEA_URL (the domain)
+      ansible.builtin.command: >-
+        docker compose exec -T backend python -c
+        "import os, urllib.request; u = os.environ['WHARFLINE_GITEA_URL']; assert '{{ gitea_domain }}' in u, u;
+        urllib.request.urlopen(u + '/api/healthz', timeout=10)"
+      args:
+        chdir: /srv/wharfline
+      changed_when: false
+
+    - name: Traefik keeps the registered domains
+      ansible.builtin.command: cat /srv/traefik/aliases.json
+      register: aliases
+      changed_when: false
+      failed_when: >-
+        gitea_domain not in (aliases.stdout | from_json).aliases or
+        wharfline_domain not in (aliases.stdout | from_json).aliases
+
     - name: wharfline Owner was created
       ansible.builtin.command: docker compose logs migrate
       args:
-        chdir: /opt/wharfline
+        chdir: /srv/wharfline
       register: wf_migrate
       changed_when: false
       failed_when: "'Owner' not in wf_migrate.stdout"
@@ -93,9 +116,9 @@
       ansible.builtin.stat:
         path: "{{ item.path }}"
       loop:
-        - { path: /opt/gitea/.env,          mode: "0600" }
-        - { path: /opt/wharfline/.env,      mode: "0600" }
-        - { path: /opt/wharfline/secrets,   mode: "0700" }
+        - { path: /srv/gitea/.env,          mode: "0600" }
+        - { path: /srv/wharfline/.env,      mode: "0600" }
+        - { path: /srv/wharfline/secrets,   mode: "0700" }
       register: perms
       failed_when: perms.stat.mode != item.mode
 

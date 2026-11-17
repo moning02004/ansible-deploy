@@ -8,7 +8,7 @@
 
 - name: "redis | stop"
   ansible.builtin.command: docker compose stop redis
-  args: { chdir: /opt/middleware }
+  args: { chdir: "{{ restore_dirs.middleware }}" }
 
 - name: "redis | replace data with backup"
   ansible.builtin.command: >-
@@ -45,4 +45,4 @@
 
 - name: "redis | start"
   ansible.builtin.command: docker compose up -d --wait redis
-  args: { chdir: /opt/middleware }
+  args: { chdir: "{{ restore_dirs.middleware }}" }

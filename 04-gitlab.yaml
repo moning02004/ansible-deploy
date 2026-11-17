@@ -17,7 +17,9 @@
 
   vars:
     site_scheme: "{{ 'https' if (traefik_acme_email | default('')) | length > 0 else 'http' }}"
+    # 서버 안 컨테이너(CI 작업 컨테이너 포함)가 이 도메인으로 접속하면 바로 Traefik 으로
     traefik_site_domains: ["{{ gitlab_domain }}", "{{ wharfline_domain }}"]
+    traefik_extra_networks: "{{ [gitlab_runner_network | default('gitlab_jobs')] if gitlab_runner_enabled | default(true) | bool else [] }}"
 
   roles:
     - { role: traefik,   tags: [traefik] }

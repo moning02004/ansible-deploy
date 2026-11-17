@@ -78,6 +78,7 @@ gitea_runner_labels: "ubuntu-latest:docker://node:22-bookworm,ubuntu-24.04:docke
 `.gitlab-ci.yml` 에 `image:` 가 없을 때 쓰는 이미지.
 - `alpine:latest` (가벼움) · `ubuntu:24.04` (apt 필요할 때) · `node:22`, `python:3.13` (언어별)
 - 러너는 호스트 docker.sock 을 씁니다 → job 에서 `docker build` 가능 (dind 불필요). ⚠️ job 이 호스트 Docker 를 다룰 수 있으니 신뢰하는 저장소만.
+- job 은 `gitlab_runner_network`(기본 `gitlab_jobs`)에서 돌아 `gitlab.<도메인>`, `deploy.<도메인>` 을 서버 안에서 Traefik 으로 찾아갑니다.
 
 ---
 

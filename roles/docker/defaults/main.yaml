@@ -1,3 +1,4 @@
+# 설치할 Docker 패키지 (docker.com 공식 저장소)
 docker_packages:
   - docker-ce
   - docker-ce-cli
@@ -6,7 +7,7 @@ docker_packages:
   - docker-compose-plugin
 docker_users:
   - "{{ deploy_user }}"
-docker_log_max_size: 10m
-docker_log_max_file: "3"
+docker_log_max_size: 10m        # 컨테이너 로그 파일 하나의 최대 크기
+docker_log_max_file: "3"        # 컨테이너마다 남길 로그 파일 개수
 # daemon.json에 추가로 합칠 옵션. 예) live-restore, registry-mirrors (docs/variables.md)
 docker_daemon_options: {}

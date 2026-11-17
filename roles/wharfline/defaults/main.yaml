@@ -1,8 +1,10 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 # https://github.com/moning02004/wharfline/releases (이미지 태그 = 릴리스 태그)
 # 주의: 이미지가 amd64 전용
 wharfline_version: v2026.11.14-1
 wharfline_repo_raw: https://raw.githubusercontent.com/moning02004/wharfline
-wharfline_dir: /opt/wharfline
+wharfline_dir: "{{ service_root | default('/srv') }}/wharfline"   # service_root 기본 /srv. 예전 기본값 /opt/wharfline 에 있으면 처음 실행 때 옮김
 
 wharfline_domain: ""                  # 필수. 예) deploy.example.com
 wharfline_url: "{{ site_scheme | default('http') }}://{{ wharfline_domain }}"
@@ -11,6 +13,9 @@ wharfline_web_bind: 127.0.0.1
 wharfline_web_port: 8080
 # ARM 서버에서 amd64 이미지를 에뮬레이션으로 돌릴 때: linux/amd64
 wharfline_platform: ""
+# .env 업로드(POST /api/hooks/env)를 확인할 Gitea. backend 컨테이너 안에서 닿는 주소.
+#   03 은 Gitea 도메인으로 자동 설정 (Traefik alias 덕분에 서버 안에서도 그 도메인이 Traefik 으로 감). 비우면 업로드 거절
+wharfline_gitea_url: ""
 wharfline_install_qemu: true          # ARM 서버에서 qemu(binfmt) 등록
 wharfline_binfmt_image: "tonistiigi/binfmt:qemu-v10.2.3-68"
 

@@ -1,4 +1,6 @@
-middleware_dir: /opt/middleware
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
+middleware_dir: "{{ service_root | default('/srv') }}/middleware"   # service_root 기본 /srv. 예전 기본값 /opt/middleware 에 있으면 처음 실행 때 옮김
 middleware_bind: 0.0.0.0
 # 외부 접속을 허용할 CIDR. 비우면 외부 접속 전부 차단 (DOCKER-USER)
 middleware_allowed_sources: []

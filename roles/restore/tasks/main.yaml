@@ -60,6 +60,19 @@
   ansible.builtin.debug:
     msg: "{{ restore_real.stdout }} → {{ restore_components | join(', ') }}"
 
+# 서비스 디렉터리: <service_root>/<이름>, 예전 서버면 /opt/<이름>
+- name: Find service directories
+  ansible.builtin.shell: |
+    for s in gitea wharfline middleware; do
+      d="{{ service_root | default('/srv') }}/$s"; [ -f "$d/docker-compose.yml" ] || d="/opt/$s"; echo "$s=$d"
+    done
+  register: restore_dirs_out
+  changed_when: false
+
+- name: Remember service directories
+  ansible.builtin.set_fact:
+    restore_dirs: "{{ dict(restore_dirs_out.stdout_lines | map('split', '=', 1)) }}"
+
 # ---------- 구성 요소별 복구 ----------
 - name: Restore components
   ansible.builtin.include_tasks: "{{ component }}.yaml"

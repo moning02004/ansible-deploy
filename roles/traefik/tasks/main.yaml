@@ -1,3 +1,10 @@
+# 예전 기본 위치 /opt/traefik 에 있던 서버는 {{ traefik_dir }} 로 옮김 (roles/service_dir)
+- name: Move service directory from /opt
+  ansible.builtin.import_role:
+    name: service_dir
+  vars:
+    service_dir: "{{ traefik_dir }}"
+
 - name: Create traefik directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -30,10 +37,38 @@
     mode: "0644"
   when: traefik_access_log | bool
 
+# 플레이북마다 자기 도메인만 알려 주므로(03: git·deploy, 07: grafana …) 이 서버에 등록된 것을 파일에 모읍니다.
+# 그래야 다른 플레이북을 나중에 돌려도 앞서 등록한 도메인·네트워크가 Traefik 에서 빠지지 않아요.
+- name: Read domains registered by earlier playbooks
+  ansible.builtin.slurp:
+    src: "{{ traefik_dir }}/aliases.json"
+  register: traefik_saved
+  failed_when: false
+
+- name: Merge domains and networks
+  ansible.builtin.set_fact:
+    traefik_alias_list: >-
+      {{ ((saved.aliases | default([])) + traefik_site_domains + traefik_domain_aliases
+          + (traefik_file_routes | map(attribute='host') | list))
+         | select | difference(traefik_forget) | unique | sort }}
+    traefik_network_list: >-
+      {{ ((saved.networks | default([])) + traefik_extra_networks)
+         | select | difference(traefik_forget + [traefik_network]) | unique | sort }}
+  vars:
+    saved: "{{ (traefik_saved.content | b64decode | from_json) if traefik_saved.content is defined else {} }}"
+
+- name: Save registered domains
+  ansible.builtin.copy:
+    dest: "{{ traefik_dir }}/aliases.json"
+    content: "{{ {'aliases': traefik_alias_list, 'networks': traefik_network_list} | to_nice_json }}\n"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+
 - name: Create shared network for routed containers
   community.docker.docker_network:
     name: "{{ item }}"
-  loop: "{{ [traefik_network] + traefik_extra_networks }}"
+  loop: "{{ [traefik_network] + traefik_network_list }}"
 
 - name: Write docker-compose.yml
   ansible.builtin.template:

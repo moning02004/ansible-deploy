@@ -22,6 +22,8 @@
   become: true
   vars:
     site_scheme: "{{ 'https' if (traefik_acme_email | default('')) | length > 0 else 'http' }}"
+    traefik_site_domains: []      # grafana_domain 은 아래 파일 라우트 host 로 alias 에 들어감
+    traefik_extra_networks: []
     # Grafana 는 host 네트워크라 Traefik 파일 라우트로 연결
     traefik_file_routes:
       - name: grafana

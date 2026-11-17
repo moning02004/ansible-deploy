@@ -1,3 +1,10 @@
+# 예전 기본 위치 /opt/wireguard 에 있던 서버는 {{ wireguard_dir }} 로 옮김 (roles/service_dir)
+- name: Move service directory from /opt
+  ansible.builtin.import_role:
+    name: service_dir
+  vars:
+    service_dir: "{{ wireguard_dir }}"
+
 - name: Check peer names
   ansible.builtin.assert:
     that: vpn_peers | select('match', '^[A-Za-z0-9]+$') | list | length == vpn_peers | length

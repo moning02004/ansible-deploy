@@ -30,8 +30,8 @@
         grep -q '"orders"' rabbitmq-definitions.json
         grep -q '"{{ rabbitmq_user }}"' rabbitmq-definitions.json
         test -s redis-dump.rdb
-        tar tzf opt-configs.tar.gz | grep -q 'postgres/.env'
-        tar tzf opt-configs.tar.gz | grep -q 'middleware/docker-compose.yml'
+        tar tzf srv-configs.tar.gz | grep -q 'postgres/.env'
+        tar tzf srv-configs.tar.gz | grep -q 'middleware/docker-compose.yml'
         grep -q sha256 MANIFEST || grep -q postgres-all MANIFEST
       changed_when: false
 

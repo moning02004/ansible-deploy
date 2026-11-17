@@ -1,5 +1,5 @@
 # 10. backup — 서버에 있는 서비스를 자동 감지해서 백업
-#   대상: postgres(06), gitea(03), wharfline(03/04), gitlab(04), rabbitmq/redis(09), /opt/*/ 설정 파일
+#   대상: postgres(06), gitea(03), wharfline(03/04), gitlab(04), rabbitmq/redis(09), /srv/*/ 설정 파일
 #   위치: /var/backups/orca/<시각>/  (latest 링크, backup_keep_days 보관)
 #   restic: backup_restic_repository 를 지정하면 외부 저장소(S3, SFTP, NAS 등)로도 전송
 #
@@ -8,6 +8,8 @@
 #   ansible-playbook ... 10-backup.yaml --tags now      # 지금 즉시 백업
 #   ansible-playbook ... 10-backup.yaml --tags now -e backup_fetch=true   # + 컨트롤러로 가져오기
 #   특정 서버만: --limit server1
+#
+#   backup_hosts  적용할 인벤토리 그룹 (기본 all)
 - name: "10 backup"
   hosts: "{{ backup_hosts | default('all') }}"
   become: true

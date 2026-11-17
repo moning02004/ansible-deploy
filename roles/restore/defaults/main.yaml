@@ -1,14 +1,8 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 restore_components: []        # [postgres, gitea, wharfline, gitlab, rabbitmq, redis]
 restore_confirm: ""           # "yes" 여야 실행
 restore_from: latest
 restore_upload_dir: ""
 restore_restic_snapshot: ""
 backup_dir: /var/backups/orca
-restore_known_components: [postgres, gitea, wharfline, gitlab, rabbitmq, redis]
-restore_required_files:
-  postgres:  [postgres-all.sql.gz]
-  gitea:     [gitea-db.dump, gitea-data.tar.gz]
-  wharfline: [wharfline-db.dump]
-  gitlab:    [gitlab_backup.tar, gitlab-config.tar.gz]
-  rabbitmq:  [rabbitmq-definitions.json]
-  redis:     [redis-dump.rdb]

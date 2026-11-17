@@ -13,6 +13,7 @@
 # Wharfline 에서 실행: 계정 이름 / 비밀번호 / sudo 는 입력칸으로 나옵니다.
 #   become_password: 접속 계정의 sudo 비밀번호. 접속 계정이 비밀번호 없이 sudo 되면 비워 둡니다.
 #   account_ssh_keys: 등록할 SSH 공개키, 한 줄에 하나씩. 없으면 비워 둡니다.
+#   account_hosts: 적용할 인벤토리 그룹 (기본 all)
 - name: "13 user | 계정 추가"
   hosts: "{{ account_hosts | default('all') }}"
   become: true
@@ -35,7 +36,7 @@
   pre_tasks:
     - name: Use the given sudo password
       ansible.builtin.set_fact:
-        ansible_become_password: "{{ become_password }}"
+        ansible_become_password: "{{ become_password | default('') }}"
       when: become_password | default('') | length > 0
       no_log: true
       tags: [user]

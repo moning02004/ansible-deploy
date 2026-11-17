@@ -21,6 +21,8 @@
     # 서버 안 컨테이너(작업 컨테이너 포함)가 이 도메인으로 접속하면 바로 Traefik 으로
     traefik_site_domains: ["{{ gitea_domain }}", "{{ wharfline_domain }}"]
     traefik_extra_networks: "{{ [gitea_runner_network | default('gitea_actions')] if gitea_runner_enabled | default(true) | bool else [] }}"
+    # wharfline 이 .env 업로드를 확인할 Gitea: 도메인 그대로 (위 alias 로 서버 안에서 Traefik → Gitea)
+    wharfline_gitea_url: "{{ site_scheme }}://{{ gitea_domain }}"
 
   roles:
     - { role: traefik,   tags: [traefik] }

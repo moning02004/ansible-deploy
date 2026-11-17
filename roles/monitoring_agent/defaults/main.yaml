@@ -1,6 +1,8 @@
+# 서비스 디렉터리의 부모. 각 서비스는 <service_root>/<이름> (예전 기본값 /opt 에 있던 것은 처음 실행 때 옮김)
+service_root: /srv
 node_exporter_version: "v1.12.1"     # https://hub.docker.com/r/prom/node-exporter
 cadvisor_version: "v0.60.6"          # https://github.com/google/cadvisor/releases
-monitoring_agent_dir: /opt/monitoring-agent
+monitoring_agent_dir: "{{ service_root | default('/srv') }}/monitoring-agent"   # service_root 기본 /srv. 예전 기본값 /opt/monitoring-agent 에 있으면 처음 실행 때 옮김
 node_exporter_port: 9100
 cadvisor_port: 9280
 # 수집을 허용할 IP (기본: [monitoring] 그룹 서버들의 IP)

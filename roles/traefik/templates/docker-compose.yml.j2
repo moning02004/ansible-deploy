@@ -42,7 +42,13 @@ services:
 {% if traefik_access_log %}
       - /var/log/traefik:/var/log/traefik
 {% endif %}
-    networks: [{{ traefik_network }}]
+{% set aliases = ((traefik_site_domains + traefik_domain_aliases + (traefik_file_routes | map(attribute='host') | list)) | select | unique | list) %}
+    # 서버 안에서 이 도메인들이 Traefik 을 가리키도록 (git.example.com 으로 clone, deploy.example.com 으로 webhook 등)
+    networks:
+{% for net in [traefik_network] + traefik_extra_networks %}
+      {{ net }}:
+        aliases: {{ aliases | to_json }}
+{% endfor %}
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 10s
@@ -53,8 +59,10 @@ services:
       options: { max-size: "10m", max-file: "5" }
 
 networks:
-  {{ traefik_network }}:
+{% for net in [traefik_network] + traefik_extra_networks %}
+  {{ net }}:
     external: true
+{% endfor %}
 
 volumes:
   letsencrypt:

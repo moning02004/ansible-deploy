@@ -16,3 +16,4 @@ gitea_admin_password: ""           # 필수 (vault)
 gitea_runner_enabled: true
 gitea_runner_name: "{{ inventory_hostname }}-runner"
 gitea_runner_labels: ""            # 비우면 act_runner 기본 라벨 (ubuntu-latest 등). 형식 "라벨:docker://이미지,..." (docs/variables.md)
+gitea_runner_network: gitea_actions  # 작업 컨테이너가 실행되는 네트워크. Gitea 와 Traefik 만 함께 붙어 있어요

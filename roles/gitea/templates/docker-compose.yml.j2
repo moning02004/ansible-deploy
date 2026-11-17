@@ -47,9 +47,15 @@ services:
       - gitea_data:/data
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-    networks: [default, {{ traefik_network | default('web') }}]
+    networks:
+      default: {}
+      {{ traefik_network | default('web') }}: {}
+{% if gitea_runner_enabled %}
+      actions: {}   # 워크플로 작업 컨테이너가 http://gitea:3000 으로 찾아오는 길 (runner-config.yaml)
+{% endif %}
     labels:
       traefik.enable: "true"
+      traefik.docker.network: "{{ traefik_network | default('web') }}"
       traefik.http.routers.gitea.rule: "Host(`{{ gitea_domain }}`)"
       traefik.http.services.gitea.loadbalancer.server.port: "3000"
     ports:
@@ -77,11 +83,13 @@ services:
     environment:
       GITEA_INSTANCE_URL: http://gitea:3000
       GITEA_RUNNER_NAME: "{{ gitea_runner_name }}"
+      CONFIG_FILE: /config.yaml
 {% if gitea_runner_labels %}
       GITEA_RUNNER_LABELS: "{{ gitea_runner_labels }}"
 {% endif %}
     volumes:
       - runner_data:/data
+      - ./runner-config.yaml:/config.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       gitea:
@@ -93,6 +101,13 @@ networks:
   default: {}
   {{ traefik_network | default('web') }}:
     external: true
+{% if gitea_runner_enabled %}
+  # 작업 컨테이너가 실행되는 네트워크. Gitea 와 Traefik 만 붙어 있어 gitea 이름과 사이트 도메인(Traefik 경유)은
+  # 찾지만 DB 나 다른 컨테이너에 직접 닿지는 않아요
+  actions:
+    name: {{ gitea_runner_network }}
+    external: true
+{% endif %}
 
 volumes:
   db_data:

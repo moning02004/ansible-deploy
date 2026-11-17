@@ -10,3 +10,10 @@ traefik_read_timeout: "0s"
 # 컨테이너가 아닌 호스트 서비스로 보낼 라우트 (예: host 네트워크로 뜬 Grafana)
 #   - { name: grafana, host: grafana.example.com, url: "http://host.docker.internal:3001" }
 traefik_file_routes: []
+# 서버 안 컨테이너가 이 도메인으로 접속하면 공인 IP 를 돌지 않고 바로 Traefik 으로 갑니다 (네트워크 alias).
+#   traefik_site_domains 는 플레이북이 채우고 (03: gitea·wharfline 도메인), 더할 것은 traefik_domain_aliases 에.
+#   traefik_file_routes 의 host 도 자동으로 들어갑니다.
+traefik_site_domains: []
+traefik_domain_aliases: []
+# Traefik 이 함께 붙는 네트워크 (03: Gitea 작업 컨테이너의 gitea_actions). 같은 alias 를 씁니다. 없으면 만듭니다
+traefik_extra_networks: []

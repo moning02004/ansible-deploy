@@ -121,6 +121,8 @@ Docker(01-base) 위에 **kubeadm 으로 단일 노드 Kubernetes** 를 설치합
 - **HTTPS**: `traefik_acme_email` 을 지정하면 Traefik 이 도메인마다 Let's Encrypt 인증서를 받고 갱신하며 HTTP → HTTPS 로 넘깁니다. Gitea ROOT_URL 과 wharfline 쿠키 Secure 도 자동으로 https 기준이 됩니다. (DNS A 레코드가 서버를 가리켜야 함, 로컬 테스트에서는 검증하지 않음)
 - **Gitea 관리자**: `gitea_admin`. `admin` 은 Gitea 예약어라 쓸 수 없습니다.
 - **act_runner**: 첫 실행 때 토큰을 발급해 자동 등록합니다. 다시 등록하려면 `/opt/gitea/runner.env` 와 `gitea_runner_data` 볼륨을 지우고 재실행하세요.
+- **작업 컨테이너 네트워크**: 워크플로 작업은 `gitea_actions` 네트워크(Gitea·Traefik 만 함께 붙음)에서 실행돼 `actions/checkout` 이 `http://gitea:3000` 으로 받아 옵니다. DB 나 다른 컨테이너에 직접 닿지는 않아요. 바꾸려면 `gitea_runner_network`.
+- **서버 안에서 도메인 접속**: Traefik 컨테이너가 `gitea_domain`·`wharfline_domain` 을 네트워크 alias 로 가져서, `web`·`gitea_actions` 의 컨테이너가 `http(s)://git.<도메인>`, `deploy.<도메인>` 으로 접속하면 공인 IP 를 돌지 않고 바로 Traefik 으로 갑니다. 다른 도메인은 `traefik_domain_aliases` 에 더하세요.
 - **wharfline 마스터 키**: `wharfline_master_key` 를 비워 두면 첫 실행 때 서버에서 만들고 `secrets/<호스트>/wharfline_master_keys` 로 가져옵니다(gitignore). **vault 로 옮기고 로컬 파일은 지우세요.** 잃으면 저장된 비밀 값을 복구할 수 없습니다.
 - **wharfline 이미지는 amd64 전용**입니다. ARM 서버에서는 `wharfline_platform: linux/amd64` 로 에뮬레이션 실행할 수 있습니다(느림).
 

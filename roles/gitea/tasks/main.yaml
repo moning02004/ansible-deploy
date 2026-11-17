@@ -33,6 +33,21 @@
     group: "{{ deploy_user }}"
     mode: "0644"
 
+- name: Write runner-config.yaml
+  ansible.builtin.template:
+    src: runner-config.yaml.j2
+    dest: "{{ gitea_dir }}/runner-config.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+  when: gitea_runner_enabled | bool
+  register: runner_config
+
+- name: Create network for workflow jobs
+  community.docker.docker_network:
+    name: "{{ gitea_runner_network }}"
+  when: gitea_runner_enabled | bool
+
 - name: Allow Gitea SSH port
   community.general.ufw:
     rule: allow
@@ -98,3 +113,11 @@
     project_src: "{{ gitea_dir }}"
     state: present
     remove_orphans: true
+
+# 설정 파일만 바뀌면 compose 는 runner 를 다시 띄우지 않으므로 직접 재시작
+- name: Restart runner for new config
+  community.docker.docker_compose_v2:
+    project_src: "{{ gitea_dir }}"
+    services: [runner]
+    state: restarted
+  when: runner_config is changed
